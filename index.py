@@ -7,8 +7,7 @@ pygame + pygbag 用
 import pygame
 import random
 import math
-import sys
-from collections import deque
+import asyncio   # ← ここで asyncio を読み込む
 
 pygame.init()
 
@@ -241,29 +240,37 @@ class Game:
         )
 
 
-game = Game()
-pygame.mouse.set_visible(True)
+async def main():
+    game = Game()
+    pygame.mouse.set_visible(True)
 
-running = True
-while running:
-    dt = clock.tick(60) / 1000
+    running = True
+    while running:
+        dt = clock.tick(60) / 1000
 
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
 
-        elif event.type == pygame.MOUSEMOTION:
-            if game.state == "playing":
-                game.ship_x = clamp(event.pos[0], 40, WIDTH-40)
+            elif event.type == pygame.MOUSEMOTION:
+                if game.state == "playing":
+                    game.ship_x = clamp(event.pos[0], 40, WIDTH-40)
 
-        elif event.type == pygame.MOUSEBUTTONDOWN:
-            if game.state == "menu":
-                game.state = "playing"
-            else:
-                game.fire()
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if game.state == "menu":
+                    game.state = "playing"
+                else:
+                    game.fire()
 
-    game.update(dt)
-    game.draw(screen)
-    pygame.display.flip()
+        game.update(dt)
+        game.draw(screen)
+        pygame.display.flip()
 
-pygame.quit()
+        # ★ pygbag向け：ブラウザ側に制御を返す
+        await asyncio.sleep(0)
+
+    pygame.quit()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
