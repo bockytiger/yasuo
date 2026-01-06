@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The だんごむし迷路</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+        h1 {
+            color: #764ba2;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+        .setup-screen, .game-screen {
+            display: none;
+        }
+        .setup-screen.active, .game-screen.active {
+            display: block;
+        }
+        .input-group {
+            margin: 20px 0;
+        }
+        label {
+            display: inline-block;
+            width: 100px;
+            font-weight: bold;
+            color: #333;
+        }
+        input[type="number"] {
+            width: 80px;
+            padding: 8px;
+            font-size: 16px;
+            border: 2px solid #667eea;
+            border-radius: 5px;
+        }
+        button {
+            margin: 10px;
+            padding: 12px 30px;
+            font-size: 16px;
+            font-weight: bold;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+        }
+        .btn-success {
+            background: #48bb78;
+            color: white;
+        }
+        .btn-success:hover {
+            background: #38a169;
+            transform: translateY(-2px);
+        }
+        .btn-danger {
+            background: #f56565;
+            color: white;
+        }
+        .btn-danger:hover {
+            background: #e53e3e;
+            transform: translateY(-2px);
+        }
+        #mazeCanvas {
+            border: 3px solid #764ba2;
+            border-radius: 10px;
+            margin: 20px auto;
+            display: block;
+            background: white;
+        }
+        .controls {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🐛 The だんごむし迷路 🐛</h1>
+        
+        <div class="setup-screen active">
+            <div class="input-group">
+                <label>縦幅:</label>
+                <input type="number" id="mazeHeight" value="15" min="5" max="50">
+            </div>
+            <div class="input-group">
+                <label>横幅:</label>
+                <input type="number" id="mazeWidth" value="15" min="5" max="50">
+            </div>
+            <button class="btn-primary" onclick="createMaze()">迷路作成</button>
+        </div>
+
+        <div class="game-screen">
+            <canvas id="mazeCanvas"></canvas>
+            <div class="controls">
+                <button class="btn-success" onclick="startGame()">迷路開始</button>
+                <button class="btn-primary" onclick="resetGame()">もう一度</button>
+                <button class="btn-danger" onclick="endGame()">終了</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let maze = [];
+        let width, height;
+        let cellSize = 30;
+        let canvas, ctx;
+        let player = { x: 0, y: 0 };
+        let goal = { x: 0, y: 0 };
+        let checkpoints = [];
+        let currentCheckpoint = 0;
+        let isPlaying = false;
+        let path = [];
+
+        function createMaze() {
+            width = parseInt(document.getElementById('mazeWidth').value);
+            height = parseInt(document.getElementById('mazeHeight').value);
+            
+            if (width % 2 === 0) width++;
+            if (height % 2 === 0) height++;
+            
+            maze = Array(height).fill().map(() => Array(width).fill(1));
+            
+            // 壁伸ばし法
+            for (let y = 1; y < height; y += 2) {
+                for (let x = 1; x < width; x += 2) {
+                    maze[y][x] = 0;
+                }
+            }
+            
+            for (let y = 1; y < height; y += 2) {
+                for (let x = 1; x < width; x += 2) {
+                    if (y === 1 && x === 1) continue;
+                    
+                    let directions = [];
+                    if (y > 1) directions.push(0); // 上
+                    if (x > 1) directions.push(1); // 左
+                    
+                    let dir = directions[Math.floor(Math.random() * directions.length)];
+                    
+                    if (dir === 0) {
+                        maze[y - 1][x] = 0;
+                    } else {
+                        maze[y][x - 1] = 0;
+                    }
+                }
+            }
+            
+            player = { x: 1, y: 1 };
+            goal = { x: width - 2, y: height - 2 };
+            
+            findPath();
+            setCheckpoints();
+            
+            document.querySelector('.setup-screen').classList.remove('active');
+            document.querySelector('.game-screen').classList.add('active');
+            
+            drawMaze();
+        }
+
+        function findPath() {
+            let visited = Array(height).fill().map(() => Array(width).fill(false));
+            let queue = [{ x: player.x, y: player.y, path: [{ x: player.x, y: player.y }] }];
+            visited[player.y][player.x] = true;
+            
+            while (queue.length > 0) {
+                let current = queue.shift();
+                
+                if (current.x === goal.x && current.y === goal.y) {
+                    path = current.path;
+                    return;
+                }
+                
+                let dirs = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+                for (let [dx, dy] of dirs) {
+                    let nx = current.x + dx;
+                    let ny = current.y + dy;
+                    
+                    if (nx >= 0 && nx < width && ny >= 0 && ny < height && 
+                        maze[ny][nx] === 0 && !visited[ny][nx]) {
+                        visited[ny][nx] = true;
+                        queue.push({
+                            x: nx,
+                            y: ny,
+                            path: [...current.path, { x: nx, y: ny }]
+                        });
+                    }
+                }
+            }
+        }
+
+        function setCheckpoints() {
+            checkpoints = [];
+            let step = Math.floor(path.length / 6);
+            for (let i = 1; i <= 5; i++) {
+                let idx = Math.min(step * i, path.length - 2);
+                checkpoints.push(path[idx]);
+            }
+        }
+
+        function drawMaze() {
+            canvas = document.getElementById('mazeCanvas');
+            canvas.width = width * cellSize;
+            canvas.height = height * cellSize;
+            ctx = canvas.getContext('2d');
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    if (maze[y][x] === 1) {
+                        ctx.fillStyle = '#2d3748';
+                        ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+                    } else {
+                        ctx.fillStyle = '#f7fafc';
+                        ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+                    }
+                }
+            }
+            
+            // チェックポイント描画
+            for (let i = 0; i < checkpoints.length; i++) {
+                let cp = checkpoints[i];
+                ctx.fillStyle = '#fbbf24';
+                ctx.font = 'bold 20px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('①②③④⑤'[i], cp.x * cellSize + cellSize / 2, cp.y * cellSize + cellSize / 2);
+            }
+            
+            // スタート
+            ctx.fillStyle = '#48bb78';
+            ctx.font = 'bold 16px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('S', player.x * cellSize + cellSize / 2, player.y * cellSize + cellSize / 2);
+            
+            // ゴール
+            ctx.fillStyle = '#f56565';
+            ctx.fillText('G', goal.x * cellSize + cellSize / 2, goal.y * cellSize + cellSize / 2);
+            
+            // プレイヤー
+            if (isPlaying) {
+                ctx.fillStyle = '#e53e3e';
+                ctx.beginPath();
+                ctx.arc(player.x * cellSize + cellSize / 2, player.y * cellSize + cellSize / 2, cellSize / 3, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function startGame() {
+            isPlaying = true;
+            currentCheckpoint = 0;
+            player = { x: 1, y: 1 };
+            drawMaze();
+            document.addEventListener('keydown', handleKeyPress);
+        }
+
+        function handleKeyPress(e) {
+            if (!isPlaying) return;
+            
+            let newX = player.x;
+            let newY = player.y;
+            
+            switch(e.key) {
+                case 'ArrowUp':
+                    newY--;
+                    break;
+                case 'ArrowDown':
+                    newY++;
+                    break;
+                case 'ArrowLeft':
+                    newX--;
+                    break;
+                case 'ArrowRight':
+                    newX++;
+                    break;
+                default:
+                    return;
+            }
+            
+            e.preventDefault();
+            
+            // 移動可能かチェック
+            if (newX >= 0 && newX < width && newY >= 0 && newY < height && maze[newY][newX] === 0) {
+                player.x = newX;
+                player.y = newY;
+                
+                // チェックポイント通過チェック
+                if (currentCheckpoint < checkpoints.length) {
+                    let cp = checkpoints[currentCheckpoint];
+                    if (player.x === cp.x && player.y === cp.y) {
+                        currentCheckpoint++;
+                    }
+                }
+                
+                drawMaze();
+                
+                // ゴール到達チェック
+                if (player.x === goal.x && player.y === goal.y) {
+                    if (currentCheckpoint === checkpoints.length) {
+                        setTimeout(() => {
+                            alert('🎉 ゴール到達！おめでとうございます！');
+                            isPlaying = false;
+                            document.removeEventListener('keydown', handleKeyPress);
+                        }, 100);
+                    } else {
+                        alert('⚠️ すべてのチェックポイント（①②③④⑤）を通過してください！');
+                    }
+                }
+            }
+        }
+
+        function resetGame() {
+            document.querySelector('.game-screen').classList.remove('active');
+            document.querySelector('.setup-screen').classList.add('active');
+            isPlaying = false;
+            currentCheckpoint = 0;
+        }
+
+        function endGame() {
+            if (confirm('迷路を終了しますか？')) {
+                location.reload();
+            }
+        }
+    </script>
+</body>
+</html>
