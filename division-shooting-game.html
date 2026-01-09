@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>わり算スペースシューター</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+            background: #000;
+        }
+        #gameContainer {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #gameCanvas {
+            display: block;
+            background: radial-gradient(ellipse at center, #1a0033 0%, #000000 100%);
+        }
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-size: 24px;
+            text-shadow: 2px 2px 4px #000;
+            z-index: 10;
+        }
+        #levelSelect {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 50, 0.9);
+            padding: 40px;
+            border-radius: 20px;
+            border: 3px solid #00ffff;
+            text-align: center;
+            z-index: 100;
+        }
+        #levelSelect h1 {
+            color: #00ffff;
+            font-size: 36px;
+            margin-bottom: 30px;
+            text-shadow: 0 0 10px #00ffff;
+        }
+        .levelBtn {
+            display: block;
+            width: 250px;
+            margin: 15px auto;
+            padding: 15px 30px;
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-shadow: 1px 1px 2px #000;
+        }
+        .levelBtn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+        }
+        #beginner {
+            background: linear-gradient(45deg, #4CAF50, #8BC34A);
+        }
+        #intermediate {
+            background: linear-gradient(45deg, #FF9800, #FFC107);
+        }
+        #advanced {
+            background: linear-gradient(45deg, #F44336, #E91E63);
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div id="levelSelect">
+            <h1>🚀 わり算スペースシューター 🚀</h1>
+            <button id="beginner" class="levelBtn">初級（答え6以下）</button>
+            <button id="intermediate" class="levelBtn">中級（九九の範囲）</button>
+            <button id="advanced" class="levelBtn">上級（10までわる）</button>
+        </div>
+        <div id="ui" class="hidden">
+            <div>問題: <span id="currentQ">1</span>/20</div>
+            <div>正解数: <span id="score">0</span></div>
+            <div id="problem" style="font-size: 32px; margin-top: 10px;"></div>
+        </div>
+        <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 900;
+        canvas.height = 700;
+
+        const ui = document.getElementById('ui');
+        const levelSelect = document.getElementById('levelSelect');
+        const problemDiv = document.getElementById('problem');
+        const currentQDiv = document.getElementById('currentQ');
+        const scoreDiv = document.getElementById('score');
+
+        let gameState = 'menu';
+        let level = '';
+        let currentQuestion = 0;
+        let score = 0;
+        let problems = [];
+        let choices = [];
+        let correctAnswer = 0;
+        let fighter = { x: 450, y: 600, width: 50, height: 50 };
+        let missiles = [];
+        let stars = [];
+        let gameOverTimer = 0;
+
+        // 星の生成
+        for (let i = 0; i < 100; i++) {
+            stars.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                size: Math.random() * 2,
+                speed: Math.random() * 0.5 + 0.2
+            });
+        }
+
+        // 問題生成
+        function generateProblems(lvl) {
+            problems = [];
+            for (let i = 0; i < 20; i++) {
+                let dividend, divisor, answer;
+                
+                if (lvl === 'beginner') {
+                    // 初級: 答えが6以下、割る数が2-4
+                    answer = Math.floor(Math.random() * 6) + 1;
+                    divisor = Math.floor(Math.random() * 3) + 2;
+                    dividend = answer * divisor;
+                } else if (lvl === 'intermediate') {
+                    // 中級: 九九の範囲
+                    divisor = Math.floor(Math.random() * 9) + 1;
+                    answer = Math.floor(Math.random() * 9) + 1;
+                    dividend = answer * divisor;
+                } else {
+                    // 上級: 割る数が10の場合もある
+                    divisor = Math.floor(Math.random() * 10) + 1;
+                    answer = Math.floor(Math.random() * 9) + 1;
+                    dividend = answer * divisor;
+                }
+                
+                problems.push({ dividend, divisor, answer });
+            }
+        }
+
+        // 選択肢生成
+        function generateChoices() {
+            const correct = problems[currentQuestion].answer;
+            const wrongAnswers = new Set();
+            
+            while (wrongAnswers.size < 3) {
+                const wrong = correct + Math.floor(Math.random() * 7) - 3;
+                if (wrong !== correct && wrong > 0) {
+                    wrongAnswers.add(wrong);
+                }
+            }
+            
+            const allChoices = [correct, ...Array.from(wrongAnswers)];
+            allChoices.sort(() => Math.random() - 0.5);
+            
+            correctAnswer = correct;
+            
+            choices = allChoices.map((ans, i) => ({
+                value: ans,
+                x: 150 + i * 180,
+                y: -100 - i * 80,
+                width: 100,
+                height: 80,
+                speed: 1.5 + Math.random() * 0.5,
+                rotation: 0,
+                rotSpeed: (Math.random() - 0.5) * 0.05
+            }));
+        }
+
+        // レベル選択
+        document.getElementById('beginner').addEventListener('click', () => startGame('beginner'));
+        document.getElementById('intermediate').addEventListener('click', () => startGame('intermediate'));
+        document.getElementById('advanced').addEventListener('click', () => startGame('advanced'));
+
+        function startGame(lvl) {
+            level = lvl;
+            generateProblems(level);
+            currentQuestion = 0;
+            score = 0;
+            gameState = 'playing';
+            levelSelect.classList.add('hidden');
+            ui.classList.remove('hidden');
+            loadQuestion();
+        }
+
+        function loadQuestion() {
+            if (currentQuestion >= 20) {
+                gameState = 'gameover';
+                return;
+            }
+            
+            const prob = problems[currentQuestion];
+            problemDiv.textContent = `${prob.dividend} ÷ ${prob.divisor} = ?`;
+            currentQDiv.textContent = currentQuestion + 1;
+            scoreDiv.textContent = score;
+            generateChoices();
+            missiles = [];
+        }
+
+        // マウス移動
+        canvas.addEventListener('mousemove', (e) => {
+            if (gameState !== 'playing') return;
+            const rect = canvas.getBoundingClientRect();
+            fighter.x = e.clientX - rect.left - fighter.width / 2;
+            fighter.x = Math.max(0, Math.min(canvas.width - fighter.width, fighter.x));
+        });
+
+        // クリックでミサイル発射
+        canvas.addEventListener('click', () => {
+            if (gameState !== 'playing') return;
+            missiles.push({
+                x: fighter.x + fighter.width / 2 - 3,
+                y: fighter.y,
+                width: 6,
+                height: 20,
+                speed: 8
+            });
+        });
+
+        // 描画関数
+        function drawStars() {
+            stars.forEach(star => {
+                ctx.fillStyle = 'white';
+                ctx.beginPath();
+                ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+                ctx.fill();
+                
+                star.y += star.speed;
+                if (star.y > canvas.height) {
+                    star.y = 0;
+                    star.x = Math.random() * canvas.width;
+                }
+            });
+        }
+
+        function drawFighter() {
+            ctx.save();
+            ctx.translate(fighter.x + fighter.width / 2, fighter.y + fighter.height / 2);
+            
+            // 戦闘機本体
+            ctx.fillStyle = '#00ccff';
+            ctx.beginPath();
+            ctx.moveTo(0, -25);
+            ctx.lineTo(-20, 25);
+            ctx.lineTo(20, 25);
+            ctx.closePath();
+            ctx.fill();
+            
+            // コックピット
+            ctx.fillStyle = '#ffff00';
+            ctx.beginPath();
+            ctx.arc(0, 0, 8, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // 翼
+            ctx.fillStyle = '#0099cc';
+            ctx.fillRect(-25, 10, 50, 5);
+            
+            ctx.restore();
+        }
+
+        function drawMeteor(choice) {
+            ctx.save();
+            ctx.translate(choice.x + choice.width / 2, choice.y + choice.height / 2);
+            ctx.rotate(choice.rotation);
+            
+            // 隕石の形
+            ctx.fillStyle = '#8B4513';
+            ctx.beginPath();
+            for (let i = 0; i < 8; i++) {
+                const angle = (i / 8) * Math.PI * 2;
+                const radius = 40 + Math.random() * 10;
+                const x = Math.cos(angle) * radius;
+                const y = Math.sin(angle) * radius;
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.closePath();
+            ctx.fill();
+            
+            // クレーター
+            ctx.fillStyle = '#654321';
+            ctx.beginPath();
+            ctx.arc(-15, -10, 8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(10, 5, 6, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // 数字
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 32px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(choice.value, 0, 0);
+            
+            ctx.restore();
+        }
+
+        function drawMissile(missile) {
+            ctx.fillStyle = '#ff0000';
+            ctx.fillRect(missile.x, missile.y, missile.width, missile.height);
+            ctx.fillStyle = '#ffff00';
+            ctx.fillRect(missile.x + 1, missile.y, missile.width - 2, missile.height / 2);
+        }
+
+        function checkCollision(missile, choice) {
+            return missile.x < choice.x + choice.width &&
+                   missile.x + missile.width > choice.x &&
+                   missile.y < choice.y + choice.height &&
+                   missile.y + missile.height > choice.y;
+        }
+
+        function gameLoop() {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            drawStars();
+
+            if (gameState === 'playing') {
+                // 選択肢の更新と描画
+                choices.forEach(choice => {
+                    choice.y += choice.speed;
+                    choice.rotation += choice.rotSpeed;
+                    drawMeteor(choice);
+                });
+
+                // ミサイルの更新と描画
+                for (let i = missiles.length - 1; i >= 0; i--) {
+                    const missile = missiles[i];
+                    missile.y -= missile.speed;
+                    drawMissile(missile);
+
+                    if (missile.y < -20) {
+                        missiles.splice(i, 1);
+                        continue;
+                    }
+
+                    // 衝突判定
+                    for (let j = choices.length - 1; j >= 0; j--) {
+                        const choice = choices[j];
+                        if (checkCollision(missile, choice)) {
+                            missiles.splice(i, 1);
+                            
+                            if (choice.value === correctAnswer) {
+                                score++;
+                                currentQuestion++;
+                                setTimeout(() => loadQuestion(), 500);
+                            } else {
+                                currentQuestion++;
+                                setTimeout(() => loadQuestion(), 500);
+                            }
+                            choices = [];
+                            break;
+                        }
+                    }
+                }
+
+                drawFighter();
+
+                // 選択肢が画面外に出たら次の問題
+                if (choices.length > 0 && choices.every(c => c.y > canvas.height)) {
+                    currentQuestion++;
+                    loadQuestion();
+                }
+            } else if (gameState === 'gameover') {
+                drawFighter();
+                
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.fillStyle = '#00ffff';
+                ctx.font = 'bold 48px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('ゲーム終了！', canvas.width / 2, canvas.height / 2 - 50);
+                
+                ctx.fillStyle = 'white';
+                ctx.font = '36px Arial';
+                ctx.fillText(`正解数: ${score} / 20`, canvas.width / 2, canvas.height / 2 + 20);
+                
+                ctx.font = '24px Arial';
+                ctx.fillText('クリックでメニューに戻る', canvas.width / 2, canvas.height / 2 + 80);
+                
+                gameOverTimer++;
+                if (gameOverTimer > 60) {
+                    canvas.addEventListener('click', resetGame);
+                }
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function resetGame() {
+            canvas.removeEventListener('click', resetGame);
+            gameState = 'menu';
+            gameOverTimer = 0;
+            levelSelect.classList.remove('hidden');
+            ui.classList.add('hidden');
+        }
+
+        gameLoop();
+    </script>
+</body>
+</html>
