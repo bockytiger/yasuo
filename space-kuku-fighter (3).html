@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>スペース九九ファイター</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Serif+JP:wght@700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .animate-fadeIn {
+            animation: fadeIn 0.6s ease-out;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        const SpaceKukuFighter = () => {
+            const [gameState, setGameState] = useState('menu');
+            const [courseSize, setCourseSize] = useState(20);
+            const [currentQuestion, setCurrentQuestion] = useState(0);
+            const [score, setScore] = useState(0);
+            const [problem, setProblem] = useState({ a: 0, b: 0, answer: 0 });
+            const [choices, setChoices] = useState([]);
+            const [shipX, setShipX] = useState(50);
+            const [beams, setBeams] = useState([]);
+            const [particles, setParticles] = useState([]);
+            const [explosions, setExplosions] = useState([]);
+            const audioContextRef = useRef(null);
+
+            useEffect(() => {
+                audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+            }, []);
+
+            const playSound = (type) => {
+                const ctx = audioContextRef.current;
+                if (!ctx) return;
+
+                const oscillator = ctx.createOscillator();
+                const gainNode = ctx.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(ctx.destination);
+
+                switch(type) {
+                    case 'shoot':
+                        oscillator.frequency.value = 800;
+                        gainNode.gain.setValueAtTime(0.3, ctx.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+                        oscillator.start(ctx.currentTime);
+                        oscillator.stop(ctx.currentTime + 0.1);
+                        break;
+                    case 'hit':
+                        oscillator.frequency.value = 200;
+                        gainNode.gain.setValueAtTime(0.5, ctx.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+                        oscillator.start(ctx.currentTime);
+                        oscillator.stop(ctx.currentTime + 0.3);
+                        break;
+                    case 'win':
+                        [400, 500, 600, 700].forEach((freq, i) => {
+                            const osc = ctx.createOscillator();
+                            const gain = ctx.createGain();
+                            osc.connect(gain);
+                            gain.connect(ctx.destination);
+                            osc.frequency.value = freq;
+                            gain.gain.setValueAtTime(0.3, ctx.currentTime + i * 0.1);
+                            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.1 + 0.2);
+                            osc.start(ctx.currentTime + i * 0.1);
+                            osc.stop(ctx.currentTime + i * 0.1 + 0.2);
+                        });
+                        break;
+                }
+            };
+
+            const generateProblem = () => {
+                const a = Math.floor(Math.random() * 9) + 1;
+                const b = Math.floor(Math.random() * 9) + 1;
+                const answer = a * b;
+                
+                const wrongAnswers = new Set();
+                while (wrongAnswers.size < 3) {
+                    const wrong = answer + (Math.floor(Math.random() * 20) - 10);
+                    if (wrong > 0 && wrong <= 81 && wrong !== answer) {
+                        wrongAnswers.add(wrong);
+                    }
+                }
+                
+                const allChoices = [answer, ...Array.from(wrongAnswers)];
+                const shuffled = allChoices.sort(() => Math.random() - 0.5);
+                
+                setProblem({ a, b, answer });
+                setChoices(shuffled.map((value, index) => ({
+                    value,
+                    x: 15 + (index * 22),
+                    y: -10,
+                    id: Math.random()
+                })));
+            };
+
+            const startGame = (size) => {
+                setCourseSize(size);
+                setGameState('playing');
+                setCurrentQuestion(0);
+                setScore(0);
+                setBeams([]);
+                setExplosions([]);
+                setParticles([]);
+                generateProblem();
+            };
+
+            const handleMouseMove = (e) => {
+                if (gameState !== 'playing') return;
+                const rect = e.currentTarget.getBoundingClientRect();
+                const x = ((e.clientX - rect.left) / rect.width) * 100;
+                setShipX(Math.max(5, Math.min(95, x)));
+            };
+
+            const handleClick = () => {
+                if (gameState !== 'playing') return;
+                playSound('shoot');
+                setBeams(prev => [...prev, { x: shipX, y: 85, id: Math.random() }]);
+            };
+
+            useEffect(() => {
+                if (gameState !== 'playing') return;
+
+                const interval = setInterval(() => {
+                    setChoices(prev => {
+                        const newChoices = prev.map(choice => ({
+                            ...choice,
+                            y: choice.y + 0.3
+                        })).filter(choice => choice.y < 100);
+                        
+                        // Check if all choices are gone (missed)
+                        if (prev.length > 0 && newChoices.length === 0) {
+                            if (currentQuestion + 1 >= courseSize) {
+                                setTimeout(() => {
+                                    setGameState('result');
+                                }, 300);
+                            } else {
+                                setTimeout(() => {
+                                    setCurrentQuestion(q => q + 1);
+                                    generateProblem();
+                                }, 300);
+                            }
+                        }
+                        
+                        return newChoices;
+                    });
+
+                    setBeams(prev => prev.map(beam => ({
+                        ...beam,
+                        y: beam.y - 2
+                    })).filter(beam => beam.y > 0));
+
+                    setBeams(prevBeams => {
+                        let newBeams = [...prevBeams];
+                        let hit = false;
+
+                        setChoices(prevChoices => {
+                            let newChoices = [...prevChoices];
+
+                            prevBeams.forEach(beam => {
+                                prevChoices.forEach(choice => {
+                                    const distance = Math.sqrt(
+                                        Math.pow(beam.x - choice.x, 2) + 
+                                        Math.pow(beam.y - choice.y, 2)
+                                    );
+
+                                    if (distance < 8 && !hit) {
+                                        hit = true;
+                                        playSound('hit');
+                                        
+                                        setExplosions(prev => [...prev, {
+                                            x: choice.x,
+                                            y: choice.y,
+                                            id: Math.random()
+                                        }]);
+
+                                        const newParticles = [];
+                                        for (let i = 0; i < 20; i++) {
+                                            newParticles.push({
+                                                x: choice.x,
+                                                y: choice.y,
+                                                vx: (Math.random() - 0.5) * 2,
+                                                vy: (Math.random() - 0.5) * 2,
+                                                id: Math.random()
+                                            });
+                                        }
+                                        setParticles(prev => [...prev, ...newParticles]);
+
+                                        if (choice.value === problem.answer) {
+                                            setScore(s => s + 1);
+                                        }
+                                        
+                                        if (currentQuestion + 1 >= courseSize) {
+                                            setTimeout(() => {
+                                                setGameState('result');
+                                                if (score + (choice.value === problem.answer ? 1 : 0) === courseSize) {
+                                                    playSound('win');
+                                                }
+                                            }, 500);
+                                        } else {
+                                            setTimeout(() => {
+                                                setCurrentQuestion(q => q + 1);
+                                                generateProblem();
+                                            }, 500);
+                                        }
+
+                                        newBeams = newBeams.filter(b => b.id !== beam.id);
+                                        newChoices = newChoices.filter(c => c.id !== choice.id);
+                                    }
+                                });
+                            });
+
+                            return newChoices;
+                        });
+
+                        return newBeams;
+                    });
+
+                    setParticles(prev => prev.map(p => ({
+                        ...p,
+                        x: p.x + p.vx,
+                        y: p.y + p.vy,
+                        vy: p.vy + 0.1
+                    })).filter(p => p.y < 100));
+
+                    setExplosions(prev => prev.slice(-5));
+                }, 20);
+
+                return () => clearInterval(interval);
+            }, [gameState, problem, currentQuestion, courseSize, score]);
+
+            const Star = ({ className, style }) => (
+                <svg className={className} style={style} viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                </svg>
+            );
+
+            const Rocket = ({ className }) => (
+                <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 5-5v10zm2 0V7l5 5-5 5z"/>
+                </svg>
+            );
+
+            const Zap = ({ className }) => (
+                <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M13 2L3 14h8l-1 8 10-12h-8l1-8z"/>
+                </svg>
+            );
+
+            const Trophy = ({ className }) => (
+                <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94.63 1.5 1.98 2.63 3.61 2.96V19H7v2h10v-2h-4v-3.1c1.63-.33 2.98-1.46 3.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm14 0c0 1.3-.84 2.4-2 2.82V7h2v1z"/>
+                </svg>
+            );
+
+            const Target = ({ className }) => (
+                <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+                    <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="2" fill="none"/>
+                    <circle cx="12" cy="12" r="4" fill="currentColor"/>
+                </svg>
+            );
+
+            return (
+                <div className="w-full h-screen bg-gradient-to-b from-gray-900 via-purple-900 to-black overflow-hidden relative font-sans">
+                    <div className="absolute inset-0 opacity-50">
+                        {[...Array(100)].map((_, i) => (
+                            <div
+                                key={i}
+                                className="absolute w-1 h-1 bg-white rounded-full animate-pulse"
+                                style={{
+                                    left: `${Math.random() * 100}%`,
+                                    top: `${Math.random() * 100}%`,
+                                    animationDelay: `${Math.random() * 3}s`,
+                                    animationDuration: `${2 + Math.random() * 2}s`
+                                }}
+                            />
+                        ))}
+                    </div>
+
+                    {gameState === 'menu' && (
+                        <div className="relative z-10 flex flex-col items-center justify-center h-full">
+                            <div className="text-center space-y-8 animate-fadeIn">
+                                <div className="relative">
+                                    <h1 className="text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 drop-shadow-2xl tracking-wider"
+                                        style={{ fontFamily: '"Orbitron", "Impact", sans-serif', textShadow: '0 0 30px rgba(59, 130, 246, 0.8)' }}>
+                                        スペース九九ファイター
+                                    </h1>
+                                    <div className="absolute -top-8 left-1/2 transform -translate-x-1/2">
+                                        <Rocket className="w-16 h-16 text-yellow-400 animate-bounce" />
+                                    </div>
+                                </div>
+                                
+                                <p className="text-2xl text-cyan-300 font-bold tracking-wide animate-pulse">
+                                    宇宙母艦から降りてくるミサイルを撃墜せよ！
+                                </p>
+
+                                <div className="space-y-4 pt-8">
+                                    {[20, 30, 50].map((size) => (
+                                        <button
+                                            key={size}
+                                            onClick={() => startGame(size)}
+                                            className="group relative px-12 py-6 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-3xl font-bold rounded-xl shadow-2xl hover:shadow-cyan-500/50 transform hover:scale-110 transition-all duration-300 border-4 border-cyan-400 overflow-hidden"
+                                        >
+                                            <span className="relative z-10 flex items-center gap-3">
+                                                <Target className="w-8 h-8" />
+                                                {size}問コース
+                                                <Zap className="w-8 h-8" />
+                                            </span>
+                                            <div className="absolute inset-0 bg-gradient-to-r from-cyan-400 to-blue-500 opacity-0 group-hover:opacity-50 transition-opacity" />
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {gameState === 'playing' && (
+                        <div 
+                            className="relative z-10 h-full"
+                            onMouseMove={handleMouseMove}
+                            onClick={handleClick}
+                        >
+                            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 w-3/4 bg-gray-800 rounded-full h-8 border-4 border-cyan-400 overflow-hidden shadow-xl">
+                                <div 
+                                    className="h-full bg-gradient-to-r from-green-400 via-blue-500 to-purple-600 transition-all duration-300 flex items-center justify-center text-white font-bold text-lg"
+                                    style={{ width: `${((currentQuestion + 1) / courseSize) * 100}%` }}
+                                >
+                                    {currentQuestion + 1} / {courseSize}
+                                </div>
+                            </div>
+
+                            <div className="absolute top-16 right-8 bg-gradient-to-r from-yellow-400 to-orange-500 px-8 py-4 rounded-xl border-4 border-yellow-300 shadow-2xl">
+                                <div className="text-2xl font-black text-white flex items-center gap-2">
+                                    <Star className="w-6 h-6" />
+                                    スコア: {score}
+                                </div>
+                            </div>
+
+                            <div className="absolute top-24 left-1/2 transform -translate-x-1/2 text-center">
+                                <div className="bg-gradient-to-r from-purple-600 to-pink-600 px-16 py-8 rounded-2xl border-8 border-pink-400 shadow-2xl animate-pulse">
+                                    <div className="text-8xl font-black text-white drop-shadow-2xl tracking-wider"
+                                         style={{ 
+                                             fontFamily: '"Noto Serif JP", serif',
+                                             textShadow: '4px 4px 0px rgba(0,0,0,0.3), 0 0 30px rgba(236, 72, 153, 0.8)'
+                                         }}>
+                                        {problem.a} × {problem.b} = ?
+                                    </div>
+                                </div>
+                            </div>
+
+                            {choices.map((choice) => (
+                                <div
+                                    key={choice.id}
+                                    className="absolute transform -translate-x-1/2"
+                                    style={{
+                                        left: `${choice.x}%`,
+                                        top: `${choice.y}%`,
+                                        transition: 'top 0.02s linear'
+                                    }}
+                                >
+                                    <div className="relative">
+                                        <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 w-8 h-8 bg-yellow-400 rounded-full blur-sm animate-pulse" />
+                                        <div className="bg-gradient-to-t from-red-600 to-orange-500 w-20 h-32 rounded-b-full rounded-t-lg border-4 border-red-800 shadow-2xl flex items-center justify-center">
+                                            <div className="text-5xl font-black text-white drop-shadow-lg"
+                                                 style={{ 
+                                                     fontFamily: '"Noto Serif JP", serif',
+                                                     textShadow: '3px 3px 0px rgba(0,0,0,0.5)'
+                                                 }}>
+                                                {choice.value}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+
+                            {beams.map((beam) => (
+                                <div
+                                    key={beam.id}
+                                    className="absolute w-2 h-12 bg-gradient-to-t from-cyan-400 to-blue-600 rounded-full shadow-2xl"
+                                    style={{
+                                        left: `${beam.x}%`,
+                                        top: `${beam.y}%`,
+                                        transform: 'translateX(-50%)',
+                                        boxShadow: '0 0 20px rgba(34, 211, 238, 0.8)'
+                                    }}
+                                />
+                            ))}
+
+                            {explosions.map((exp) => (
+                                <div
+                                    key={exp.id}
+                                    className="absolute w-32 h-32 rounded-full animate-ping"
+                                    style={{
+                                        left: `${exp.x}%`,
+                                        top: `${exp.y}%`,
+                                        transform: 'translate(-50%, -50%)',
+                                        background: 'radial-gradient(circle, rgba(255,100,0,0.8) 0%, rgba(255,200,0,0.4) 50%, transparent 70%)',
+                                    }}
+                                />
+                            ))}
+
+                            {particles.map((particle) => (
+                                <div
+                                    key={particle.id}
+                                    className="absolute w-2 h-2 bg-yellow-400 rounded-full"
+                                    style={{
+                                        left: `${particle.x}%`,
+                                        top: `${particle.y}%`,
+                                    }}
+                                />
+                            ))}
+
+                            <div
+                                className="absolute bottom-8 transform -translate-x-1/2 transition-all duration-100"
+                                style={{ left: `${shipX}%` }}
+                            >
+                                <div className="relative">
+                                    <div className="w-24 h-24 bg-gradient-to-b from-cyan-400 to-blue-600 relative border-4 border-cyan-300 shadow-2xl"
+                                         style={{ 
+                                             clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)',
+                                             filter: 'drop-shadow(0 0 20px rgba(34, 211, 238, 0.8))'
+                                         }}>
+                                        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-yellow-400 rounded-full animate-pulse" />
+                                    </div>
+                                    <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2 w-12 h-12 bg-orange-500 rounded-full blur-xl opacity-75 animate-pulse" />
+                                </div>
+                            </div>
+
+                            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-center">
+                                <p className="text-xl text-cyan-300 font-bold bg-black/50 px-6 py-3 rounded-lg backdrop-blur">
+                                    マウスで移動 • クリックでビーム発射！
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {gameState === 'result' && (
+                        <div className="relative z-10 flex flex-col items-center justify-center h-full">
+                            <div className="text-center space-y-8 animate-fadeIn">
+                                {score === courseSize ? (
+                                    <>
+                                        <div className="relative">
+                                            <Trophy className="w-32 h-32 text-yellow-400 mx-auto animate-bounce mb-4" />
+                                            <div className="absolute inset-0 bg-yellow-400 rounded-full blur-3xl opacity-30 animate-pulse" />
+                                        </div>
+                                        <h2 className="text-8xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 animate-pulse"
+                                            style={{ textShadow: '0 0 40px rgba(251, 191, 36, 0.8)' }}>
+                                            100点満点
+                                        </h2>
+                                        <h3 className="text-6xl font-black text-cyan-400"
+                                            style={{ textShadow: '0 0 30px rgba(34, 211, 238, 0.8)' }}>
+                                            九九マスター！
+                                        </h3>
+                                        {[...Array(30)].map((_, i) => (
+                                            <div
+                                                key={i}
+                                                className="absolute w-4 h-4 bg-yellow-400 rounded-full animate-ping"
+                                                style={{
+                                                    left: `${Math.random() * 100}%`,
+                                                    top: `${Math.random() * 100}%`,
+                                                    animationDelay: `${Math.random() * 2}s`,
+                                                    animationDuration: `${1 + Math.random()}s`
+                                                }}
+                                            />
+                                        ))}
+                                    </>
+                                ) : score >= courseSize * 0.9 ? (
+                                    <>
+                                        <Star className="w-24 h-24 text-green-400 mx-auto animate-spin" style={{ animationDuration: '3s' }} />
+                                        <h2 className="text-7xl font-black text-green-400"
+                                            style={{ textShadow: '0 0 30px rgba(74, 222, 128, 0.8)' }}>
+                                            合格！
+                                        </h2>
+                                        <p className="text-5xl font-bold text-white">
+                                            {courseSize}問中 {score}問正解
+                                        </p>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Target className="w-24 h-24 text-orange-400 mx-auto" />
+                                        <h2 className="text-6xl font-black text-orange-400"
+                                            style={{ textShadow: '0 0 30px rgba(251, 146, 60, 0.8)' }}>
+                                            もう一度挑戦！
+                                        </h2>
+                                        <p className="text-4xl font-bold text-white">
+                                            {courseSize}問中 {score}問正解
+                                        </p>
+                                    </>
+                                )}
+
+                                <button
+                                    onClick={() => setGameState('menu')}
+                                    className="mt-12 px-16 py-6 bg-gradient-to-r from-cyan-500 to-blue-600 text-white text-3xl font-bold rounded-xl shadow-2xl hover:shadow-cyan-500/50 transform hover:scale-110 transition-all duration-300 border-4 border-cyan-300"
+                                >
+                                    タイトルに戻る
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<SpaceKukuFighter />);
+    </script>
+</body>
+</html>
