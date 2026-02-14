@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小数のあるわり算・計算機</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState } = React;
+
+        function DecimalDivisionCalculator() {
+            const [dividend, setDividend] = useState(''); // わられる数
+            const [divisor, setDivisor] = useState(''); // わる数
+            const [activeInput, setActiveInput] = useState('dividend'); // どちらの入力がアクティブか
+            const [decimalPlaces, setDecimalPlaces] = useState(1); // 小数点以下の桁数
+            const [quotient, setQuotient] = useState(''); // 商
+            const [remainder, setRemainder] = useState(''); // あまり
+            const [calculated, setCalculated] = useState(false);
+
+            // テンキーの数字をクリック
+            const handleNumberClick = (num) => {
+                if (activeInput === 'dividend') {
+                    setDividend(prev => prev + num);
+                } else {
+                    setDivisor(prev => prev + num);
+                }
+                setCalculated(false);
+            };
+
+            // 小数点をクリック
+            const handleDecimalClick = () => {
+                if (activeInput === 'dividend' && !dividend.includes('.')) {
+                    setDividend(prev => prev + '.');
+                } else if (activeInput === 'divisor' && !divisor.includes('.')) {
+                    setDivisor(prev => prev + '.');
+                }
+                setCalculated(false);
+            };
+
+            // クリアボタン
+            const handleClear = () => {
+                if (activeInput === 'dividend') {
+                    setDividend('');
+                } else {
+                    setDivisor('');
+                }
+                setCalculated(false);
+            };
+
+            // 全てクリア
+            const handleAllClear = () => {
+                setDividend('');
+                setDivisor('');
+                setQuotient('');
+                setRemainder('');
+                setCalculated(false);
+            };
+
+            // 計算
+            const handleCalculate = () => {
+                if (dividend === '' || divisor === '' || divisor === '0') {
+                    alert('正しい数値を入力してください');
+                    return;
+                }
+
+                const dividendNum = parseFloat(dividend);
+                const divisorNum = parseFloat(divisor);
+
+                // 商を計算（指定された小数点以下の桁数で切り捨て）
+                const quotientRaw = dividendNum / divisorNum;
+                const multiplier = Math.pow(10, decimalPlaces);
+                const quotientRounded = Math.floor(quotientRaw * multiplier) / multiplier;
+
+                // あまりを計算
+                const remainderValue = dividendNum - (quotientRounded * divisorNum);
+
+                setQuotient(quotientRounded.toString());
+                setRemainder(remainderValue.toFixed(Math.max(decimalPlaces, 10))); // 十分な精度で表示
+                setCalculated(true);
+            };
+
+            return (
+                <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    padding: '20px',
+                    fontFamily: 'Arial, sans-serif',
+                    minHeight: '100vh',
+                    backgroundColor: '#f5f5f5'
+                }}>
+                    {/* タイトル */}
+                    <h1 style={{
+                        fontSize: '32px',
+                        marginBottom: '30px',
+                        color: '#333'
+                    }}>
+                        小数のあるわり算・計算機
+                    </h1>
+
+                    {/* 入力欄 */}
+                    <div style={{
+                        marginBottom: '30px',
+                        display: 'flex',
+                        gap: '20px',
+                        alignItems: 'center'
+                    }}>
+                        <div>
+                            <div style={{ fontSize: '14px', marginBottom: '5px' }}>わられる数</div>
+                            <input
+                                type="text"
+                                value={dividend}
+                                onFocus={() => setActiveInput('dividend')}
+                                readOnly
+                                style={{
+                                    width: '150px',
+                                    padding: '10px',
+                                    fontSize: '24px',
+                                    textAlign: 'center',
+                                    border: activeInput === 'dividend' ? '3px solid #ff6b6b' : '2px solid #ccc',
+                                    borderRadius: '5px',
+                                    color: 'red',
+                                    fontWeight: 'bold',
+                                    backgroundColor: 'white'
+                                }}
+                            />
+                        </div>
+                        <div>
+                            <div style={{ fontSize: '14px', marginBottom: '5px' }}>わる数</div>
+                            <input
+                                type="text"
+                                value={divisor}
+                                onFocus={() => setActiveInput('divisor')}
+                                readOnly
+                                style={{
+                                    width: '150px',
+                                    padding: '10px',
+                                    fontSize: '24px',
+                                    textAlign: 'center',
+                                    border: activeInput === 'divisor' ? '3px solid #4a90e2' : '2px solid #ccc',
+                                    borderRadius: '5px',
+                                    color: 'blue',
+                                    fontWeight: 'bold',
+                                    backgroundColor: 'white'
+                                }}
+                            />
+                        </div>
+                    </div>
+
+                    {/* 式の表示 */}
+                    <div style={{
+                        fontSize: '36px',
+                        marginBottom: '20px',
+                        fontWeight: 'bold',
+                        textAlign: 'center'
+                    }}>
+                        <span style={{ color: 'red' }}>{dividend || '?'}</span>
+                        {' ÷ '}
+                        <span style={{ color: 'blue' }}>{divisor || '?'}</span>
+                        {' = '}
+                        <span style={{ color: 'black' }}>{quotient || '?'}</span>
+                        {calculated && (
+                            <>
+                                {' あまり '}
+                                <span style={{ color: 'green' }}>{remainder}</span>
+                            </>
+                        )}
+                    </div>
+
+                    {/* 小数点以下の桁数選択 */}
+                    <div style={{
+                        marginBottom: '20px',
+                        display: 'flex',
+                        gap: '10px'
+                    }}>
+                        <button
+                            onClick={() => setDecimalPlaces(1)}
+                            style={{
+                                padding: '12px 24px',
+                                fontSize: '16px',
+                                border: decimalPlaces === 1 ? '3px solid #4a90e2' : '2px solid #ccc',
+                                borderRadius: '5px',
+                                backgroundColor: decimalPlaces === 1 ? '#e3f2fd' : 'white',
+                                cursor: 'pointer',
+                                fontWeight: decimalPlaces === 1 ? 'bold' : 'normal'
+                            }}
+                        >
+                            小数第一位まで
+                        </button>
+                        <button
+                            onClick={() => setDecimalPlaces(2)}
+                            style={{
+                                padding: '12px 24px',
+                                fontSize: '16px',
+                                border: decimalPlaces === 2 ? '3px solid #4a90e2' : '2px solid #ccc',
+                                borderRadius: '5px',
+                                backgroundColor: decimalPlaces === 2 ? '#e3f2fd' : 'white',
+                                cursor: 'pointer',
+                                fontWeight: decimalPlaces === 2 ? 'bold' : 'normal'
+                            }}
+                        >
+                            小数第二位まで
+                        </button>
+                        <button
+                            onClick={() => setDecimalPlaces(3)}
+                            style={{
+                                padding: '12px 24px',
+                                fontSize: '16px',
+                                border: decimalPlaces === 3 ? '3px solid #4a90e2' : '2px solid #ccc',
+                                borderRadius: '5px',
+                                backgroundColor: decimalPlaces === 3 ? '#e3f2fd' : 'white',
+                                cursor: 'pointer',
+                                fontWeight: decimalPlaces === 3 ? 'bold' : 'normal'
+                            }}
+                        >
+                            小数第三位まで
+                        </button>
+                    </div>
+
+                    {/* 計算ボタン */}
+                    <button
+                        onClick={handleCalculate}
+                        style={{
+                            padding: '15px 60px',
+                            fontSize: '24px',
+                            backgroundColor: '#4CAF50',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            marginBottom: '30px',
+                            fontWeight: 'bold',
+                            boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                        }}
+                    >
+                        計算する
+                    </button>
+
+                    {/* テンキー（右下に配置） */}
+                    <div style={{
+                        position: 'fixed',
+                        bottom: '20px',
+                        right: '20px',
+                        backgroundColor: 'white',
+                        padding: '20px',
+                        borderRadius: '10px',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                    }}>
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(3, 1fr)',
+                            gap: '10px',
+                            marginBottom: '10px'
+                        }}>
+                            {[7, 8, 9, 4, 5, 6, 1, 2, 3].map(num => (
+                                <button
+                                    key={num}
+                                    onClick={() => handleNumberClick(num.toString())}
+                                    style={{
+                                        width: '60px',
+                                        height: '60px',
+                                        fontSize: '24px',
+                                        backgroundColor: '#fff',
+                                        border: '2px solid #ddd',
+                                        borderRadius: '5px',
+                                        cursor: 'pointer',
+                                        fontWeight: 'bold'
+                                    }}
+                                >
+                                    {num}
+                                </button>
+                            ))}
+                        </div>
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(3, 1fr)',
+                            gap: '10px'
+                        }}>
+                            <button
+                                onClick={handleClear}
+                                style={{
+                                    width: '60px',
+                                    height: '60px',
+                                    fontSize: '18px',
+                                    backgroundColor: '#ff9800',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '5px',
+                                    cursor: 'pointer',
+                                    fontWeight: 'bold'
+                                }}
+                            >
+                                C
+                            </button>
+                            <button
+                                onClick={() => handleNumberClick('0')}
+                                style={{
+                                    width: '60px',
+                                    height: '60px',
+                                    fontSize: '24px',
+                                    backgroundColor: '#fff',
+                                    border: '2px solid #ddd',
+                                    borderRadius: '5px',
+                                    cursor: 'pointer',
+                                    fontWeight: 'bold'
+                                }}
+                            >
+                                0
+                            </button>
+                            <button
+                                onClick={handleDecimalClick}
+                                style={{
+                                    width: '60px',
+                                    height: '60px',
+                                    fontSize: '24px',
+                                    backgroundColor: '#fff',
+                                    border: '2px solid #ddd',
+                                    borderRadius: '5px',
+                                    cursor: 'pointer',
+                                    fontWeight: 'bold'
+                                }}
+                            >
+                                .
+                            </button>
+                        </div>
+                        <button
+                            onClick={handleAllClear}
+                            style={{
+                                width: '100%',
+                                height: '50px',
+                                fontSize: '18px',
+                                backgroundColor: '#f44336',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '5px',
+                                cursor: 'pointer',
+                                marginTop: '10px',
+                                fontWeight: 'bold'
+                            }}
+                        >
+                            全てクリア
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<DecimalDivisionCalculator />, document.getElementById('root'));
+    </script>
+</body>
+</html>
