@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Maze - Wooden Style</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background-color: #1a1a1a;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            font-family: 'Meiryo', Arial, sans-serif;
+            color: white;
+        }
+        
+        h1 {
+            margin-bottom: 10px;
+            color: #ffd700;
+        }
+        
+        #gameCanvas {
+            border: 3px solid #444;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            display: block;
+            margin-bottom: 20px;
+        }
+        
+        .controls {
+            background-color: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 1000px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+        
+        .controls h2 {
+            margin-top: 0;
+            color: #ffd700;
+            font-size: 20px;
+        }
+        
+        .control-group {
+            margin-bottom: 15px;
+        }
+        
+        .control-group strong {
+            color: #88ccff;
+            display: inline-block;
+            width: 120px;
+        }
+        
+        .control-group span {
+            color: #ddd;
+        }
+        
+        .note {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #333;
+            border-left: 4px solid #ffd700;
+            font-size: 14px;
+            color: #ccc;
+        }
+    </style>
+</head>
+<body>
+    <h1>🏰 3D Maze - Wooden Style</h1>
+    
+    <canvas id="gameCanvas" width="1000" height="600"></canvas>
+    
+    <div class="controls">
+        <h2>操作方法</h2>
+        <div class="control-group">
+            <strong>移動:</strong>
+            <span>W (前進) / S (後退)</span>
+        </div>
+        <div class="control-group">
+            <strong>横移動:</strong>
+            <span>← (左) / → (右)</span>
+        </div>
+        <div class="control-group">
+            <strong>回転:</strong>
+            <span>A (左回転) / D (右回転)</span>
+        </div>
+        <div class="control-group">
+            <strong>新しい迷路:</strong>
+            <span>スペースキー</span>
+        </div>
+        
+        <div class="note">
+            <strong>目標:</strong> 左上のミニマップで赤い四角（ゴール）を目指してください！<br>
+            緑の四角がスタート地点です。
+        </div>
+    </div>
+    
+    <script>
+        // 3D Maze (raycast) with wooden walls - JavaScript version
+
+        // -------- configuration --------
+        const SCREEN_W = 1000;
+        const SCREEN_H = 600;
+        const FPS = 60;
+
+        const MAZE_COLS = 21;
+        const MAZE_ROWS = 21;
+        const CELL_SIZE_MINIMAP = 8;
+
+        const FOV = Math.PI / 3; // 60 degrees
+        const NUM_RAYS = 200;
+        const MAX_DEPTH = 20.0;
+
+        const START_CELL = [1, 1];
+        const START_POS = [1.5, 1.5];
+
+        // colors
+        const COLOR_CEILING = 'rgb(70, 70, 100)';
+        const COLOR_FLOOR = 'rgb(90, 90, 90)';
+        const COLOR_MINIMAP_WALL = 'rgb(220, 220, 220)';
+        const COLOR_PLAYER = 'rgb(255, 0, 0)';
+        const COLOR_START = 'rgb(0, 200, 0)';
+        const COLOR_GOAL = 'rgb(200, 50, 50)';
+
+        const WOOD_BASE = [180, 150, 100]; // 木目ベース色
+
+        // ------- maze generation -------
+        function generateMaze(cols, rows) {
+            const grid = Array(rows).fill(null).map(() => Array(cols).fill(1));
+            const stack = [[START_CELL[0], START_CELL[1]]];
+            grid[1][1] = 0;
+            const dirs = [[2, 0], [-2, 0], [0, 2], [0, -2]];
+
+            while (stack.length > 0) {
+                const [x, y] = stack[stack.length - 1];
+                const neighbors = [];
+
+                for (const [dx, dy] of dirs) {
+                    const nx = x + dx;
+                    const ny = y + dy;
+                    if (nx > 0 && nx < cols && ny > 0 && ny < rows && grid[ny][nx] === 1) {
+                        neighbors.push([nx, ny, dx, dy]);
+                    }
+                }
+
+                if (neighbors.length > 0) {
+                    const [nx, ny, dx, dy] = neighbors[Math.floor(Math.random() * neighbors.length)];
+                    grid[y + Math.floor(dy / 2)][x + Math.floor(dx / 2)] = 0;
+                    grid[ny][nx] = 0;
+                    stack.push([nx, ny]);
+                } else {
+                    stack.pop();
+                }
+            }
+            return grid;
+        }
+
+        function isWall(grid, x, y) {
+            if (x < 0 || y < 0 || x >= grid[0].length || y >= grid.length) {
+                return true;
+            }
+            return grid[y][x] === 1;
+        }
+
+        // ------- goal search -------
+        function findFarthestCell(grid, start) {
+            const [sx, sy] = start;
+            const queue = [[sx, sy, 0]];
+            const visited = Array(grid.length).fill(null).map(() => Array(grid[0].length).fill(false));
+            visited[sy][sx] = true;
+            let far = [sx, sy];
+            let maxd = 0;
+
+            while (queue.length > 0) {
+                const [x, y, d] = queue.shift();
+                if (d > maxd) {
+                    maxd = d;
+                    far = [x, y];
+                }
+
+                for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                    const nx = x + dx;
+                    const ny = y + dy;
+                    if (nx >= 0 && nx < grid[0].length && ny >= 0 && ny < grid.length) {
+                        if (!visited[ny][nx] && grid[ny][nx] === 0) {
+                            visited[ny][nx] = true;
+                            queue.push([nx, ny, d + 1]);
+                        }
+                    }
+                }
+            }
+            return far;
+        }
+
+        // ------- raycasting with wooden wall -------
+        function castRays(ctx, grid, px, py, pa) {
+            const half = Math.floor(SCREEN_H / 2);
+            
+            // Draw ceiling
+            ctx.fillStyle = COLOR_CEILING;
+            ctx.fillRect(0, 0, SCREEN_W, half);
+            
+            // Draw floor
+            ctx.fillStyle = COLOR_FLOOR;
+            ctx.fillRect(0, half, SCREEN_W, half);
+
+            const step = FOV / NUM_RAYS;
+            const start = pa - FOV / 2;
+
+            for (let i = 0; i < NUM_RAYS; i++) {
+                let ra = (start + i * step) % (2 * Math.PI);
+                const sin_a = Math.sin(ra);
+                const cos_a = Math.cos(ra);
+                let depth = 0;
+
+                while (depth < MAX_DEPTH) {
+                    depth += 0.05;
+                    const x = px + cos_a * depth;
+                    const y = py + sin_a * depth;
+                    
+                    if (isWall(grid, Math.floor(x), Math.floor(y))) {
+                        depth *= Math.cos(ra - pa);
+
+                        if (depth < 0.01) {
+                            depth = 0.01;
+                        }
+
+                        const wall_h = Math.floor((1 / depth) * SCREEN_H);
+
+                        // ---- 木目模様 ----
+                        const grain = Math.sin((i * 0.15) + depth * 3) * 15;
+                        const shade = 1.0 - Math.min(depth / 15.0, 0.7);
+
+                        const r = Math.floor((WOOD_BASE[0] + grain) * shade);
+                        const g = Math.floor((WOOD_BASE[1] + grain * 0.6) * shade);
+                        const b = Math.floor((WOOD_BASE[2] + grain * 0.3) * shade);
+
+                        ctx.fillStyle = `rgb(${Math.max(0, r)}, ${Math.max(0, g)}, ${Math.max(0, b)})`;
+                        
+                        const w = SCREEN_W / NUM_RAYS;
+                        ctx.fillRect(i * w, half - wall_h / 2, w + 1, wall_h);
+                        break;
+                    }
+                }
+            }
+        }
+
+        // ------- minimap -------
+        function drawMinimap(ctx, grid, px, py, pa, goal) {
+            const ox = 10;
+            const oy = 10;
+            const c = CELL_SIZE_MINIMAP;
+
+            // Draw walls
+            ctx.fillStyle = COLOR_MINIMAP_WALL;
+            for (let y = 0; y < grid.length; y++) {
+                for (let x = 0; x < grid[0].length; x++) {
+                    if (grid[y][x] === 1) {
+                        ctx.fillRect(ox + x * c, oy + y * c, c, c);
+                    }
+                }
+            }
+
+            // Draw start
+            ctx.fillStyle = COLOR_START;
+            ctx.fillRect(ox + START_CELL[0] * c, oy + START_CELL[1] * c, c, c);
+            
+            // Draw goal
+            ctx.fillStyle = COLOR_GOAL;
+            ctx.fillRect(ox + goal[0] * c, oy + goal[1] * c, c, c);
+
+            // Draw player
+            const cx = ox + px * c;
+            const cy = oy + py * c;
+            ctx.fillStyle = COLOR_PLAYER;
+            ctx.beginPath();
+            ctx.arc(cx, cy, 5, 0, 2 * Math.PI);
+            ctx.fill();
+
+            // Direction arrow
+            const dx = Math.cos(pa) * 20;
+            const dy = Math.sin(pa) * 20;
+            ctx.strokeStyle = COLOR_PLAYER;
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(cx + dx, cy + dy);
+            ctx.stroke();
+        }
+
+        // ------- main game class -------
+        class MazeGame {
+            constructor(canvas) {
+                this.canvas = canvas;
+                this.ctx = canvas.getContext('2d');
+                this.keys = {};
+                
+                console.log('Generating maze...');
+                this.grid = generateMaze(MAZE_COLS, MAZE_ROWS);
+                this.goal = findFarthestCell(this.grid, START_CELL);
+                console.log('Goal position:', this.goal);
+                
+                this.px = START_POS[0];
+                this.py = START_POS[1];
+                this.pa = 0.0;
+                
+                this.lastTime = 0;
+                this.goalReached = false;
+                this.goalTime = 0;
+                
+                this.setupEventListeners();
+                console.log('Starting game loop...');
+                requestAnimationFrame((t) => this.gameLoop(t));
+            }
+            
+            setupEventListeners() {
+                window.addEventListener('keydown', (e) => {
+                    const key = e.key.toLowerCase();
+                    this.keys[key] = true;
+                    
+                    if (e.key === ' ' || e.key === 'Spacebar') {
+                        e.preventDefault();
+                        this.resetMaze();
+                    }
+                });
+                
+                window.addEventListener('keyup', (e) => {
+                    const key = e.key.toLowerCase();
+                    this.keys[key] = false;
+                });
+            }
+            
+            resetMaze() {
+                console.log('Resetting maze...');
+                this.grid = generateMaze(MAZE_COLS, MAZE_ROWS);
+                this.goal = findFarthestCell(this.grid, START_CELL);
+                this.px = START_POS[0];
+                this.py = START_POS[1];
+                this.pa = 0.0;
+                this.goalReached = false;
+            }
+            
+            checkCollision(x, y) {
+                const offsets = [[-0.18, -0.18], [0.18, 0.18], [-0.18, 0.18], [0.18, -0.18]];
+                for (const [dx, dy] of offsets) {
+                    if (isWall(this.grid, Math.floor(x + dx), Math.floor(y + dy))) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+            
+            update() {
+                if (this.goalReached) {
+                    return;
+                }
+                
+                // Movement
+                const mv = ((this.keys['w'] ? 1 : 0) - (this.keys['s'] ? 1 : 0)) * 0.06;
+                const sv = ((this.keys['arrowright'] ? 1 : 0) - (this.keys['arrowleft'] ? 1 : 0)) * 0.05;
+                
+                // Rotation
+                this.pa += ((this.keys['d'] ? 1 : 0) - (this.keys['a'] ? 1 : 0)) * 0.04;
+                
+                // Calculate new position
+                const nx = this.px + Math.cos(this.pa) * mv - Math.sin(this.pa) * sv;
+                const ny = this.py + Math.sin(this.pa) * mv + Math.cos(this.pa) * sv;
+                
+                // Update position if no collision
+                if (!this.checkCollision(nx, ny)) {
+                    this.px = nx;
+                    this.py = ny;
+                }
+                
+                // Check goal
+                if (Math.floor(this.px) === this.goal[0] && Math.floor(this.py) === this.goal[1]) {
+                    this.goalReached = true;
+                    this.goalTime = Date.now();
+                    console.log('Goal reached!');
+                    setTimeout(() => {
+                        this.resetMaze();
+                    }, 1200);
+                }
+            }
+            
+            render() {
+                // Clear canvas
+                this.ctx.fillStyle = 'rgb(30, 30, 30)';
+                this.ctx.fillRect(0, 0, SCREEN_W, SCREEN_H);
+                
+                // Render 3D view
+                castRays(this.ctx, this.grid, this.px, this.py, this.pa);
+                
+                // Render minimap
+                drawMinimap(this.ctx, this.grid, this.px, this.py, this.pa, this.goal);
+                
+                // Show goal message
+                if (this.goalReached && Date.now() - this.goalTime < 1200) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                    this.ctx.fillRect(0, 0, SCREEN_W, SCREEN_H);
+                    
+                    this.ctx.fillStyle = 'rgb(255, 255, 0)';
+                    this.ctx.font = '48px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('GOAL!', SCREEN_W / 2, SCREEN_H / 2);
+                }
+            }
+            
+            gameLoop(timestamp) {
+                this.update();
+                this.render();
+                
+                requestAnimationFrame((t) => this.gameLoop(t));
+            }
+        }
+
+        // Initialize game when page loads
+        window.addEventListener('load', () => {
+            console.log('Page loaded, initializing game...');
+            const canvas = document.getElementById('gameCanvas');
+            if (canvas) {
+                console.log('Canvas found!');
+                new MazeGame(canvas);
+            } else {
+                console.error('Canvas not found!');
+            }
+        });
+    </script>
+</body>
+</html>
