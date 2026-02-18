@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>迷路ゲーム</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #2c3e50;
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            border: 3px solid #34495e;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const CELL_SIZE = 20;
+        const MAZE_WIDTH = 21;
+        const MAZE_HEIGHT = 21;
+        const WIDTH = MAZE_WIDTH * CELL_SIZE;
+        const HEIGHT = MAZE_HEIGHT * CELL_SIZE + 100;
+
+        const WHITE = '#FFFFFF';
+        const BLACK = '#000000';
+        const GREEN = '#00C800';
+        const RED = '#C80000';
+        const BLUE = '#0000FF';
+        const GRAY = '#B4B4B4';
+
+        let canvas, ctx;
+        let maze = [];
+        let playerX, playerY;
+        let goalX, goalY;
+        let startTime = null;
+        let started = false;
+        let gameOver = false;
+        let elapsedTime = 0;
+        let keys = {};
+
+        function generateMaze(width, height) {
+            const maze = Array(height).fill().map(() => Array(width).fill(1));
+            const stack = [[0, 0]];
+            maze[0][0] = 0;
+            const directions = [[0, -2], [0, 2], [-2, 0], [2, 0]];
+
+            while (stack.length > 0) {
+                const [x, y] = stack[stack.length - 1];
+                const shuffled = directions.sort(() => Math.random() - 0.5);
+                let moved = false;
+
+                for (const [dx, dy] of shuffled) {
+                    const nx = x + dx;
+                    const ny = y + dy;
+                    if (nx >= 0 && nx < width && ny >= 0 && ny < height && maze[ny][nx] === 1) {
+                        maze[ny][nx] = 0;
+                        maze[y + Math.floor(dy / 2)][x + Math.floor(dx / 2)] = 0;
+                        stack.push([nx, ny]);
+                        moved = true;
+                        break;
+                    }
+                }
+
+                if (!moved) {
+                    stack.pop();
+                }
+            }
+
+            maze[height - 1][width - 1] = 0;
+            return maze;
+        }
+
+        function resetGame() {
+            maze = generateMaze(MAZE_WIDTH, MAZE_HEIGHT);
+            playerX = 0;
+            playerY = 0;
+            goalX = MAZE_WIDTH - 1;
+            goalY = MAZE_HEIGHT - 1;
+            startTime = null;
+            started = false;
+            gameOver = false;
+            elapsedTime = 0;
+        }
+
+        function drawGame() {
+            ctx.fillStyle = BLACK;
+            ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+            for (let y = 0; y < MAZE_HEIGHT; y++) {
+                for (let x = 0; x < MAZE_WIDTH; x++) {
+                    if (maze[y][x] === 0) {
+                        ctx.fillStyle = WHITE;
+                        ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE + 50, CELL_SIZE, CELL_SIZE);
+                    }
+                }
+            }
+
+            ctx.fillStyle = GREEN;
+            ctx.fillRect(0, 50, CELL_SIZE, CELL_SIZE);
+
+            ctx.fillStyle = RED;
+            ctx.fillRect(goalX * CELL_SIZE, goalY * CELL_SIZE + 50, CELL_SIZE, CELL_SIZE);
+
+            ctx.fillStyle = BLUE;
+            ctx.fillRect(playerX * CELL_SIZE, playerY * CELL_SIZE + 50, CELL_SIZE, CELL_SIZE);
+
+            if (started && !gameOver) {
+                elapsedTime = (Date.now() - startTime) / 1000;
+            }
+
+            ctx.fillStyle = WHITE;
+            ctx.font = '24px Arial';
+            ctx.fillText(`経過時間: ${elapsedTime.toFixed(1)} 秒`, 10, 30);
+
+            if (gameOver) {
+                ctx.fillStyle = RED;
+                ctx.fillText(`ゴール！ 記録: ${elapsedTime.toFixed(1)} 秒`, WIDTH / 4, 30);
+
+                ctx.fillStyle = GRAY;
+                ctx.fillRect(WIDTH / 2 - 80, HEIGHT - 60, 160, 40);
+                ctx.fillStyle = BLACK;
+                ctx.font = '24px Arial';
+                ctx.fillText('もう一回', WIDTH / 2 - 40, HEIGHT - 35);
+            }
+        }
+
+        function update() {
+            let moved = false;
+
+            if (!gameOver) {
+                if (keys['ArrowUp'] && playerY > 0 && maze[playerY - 1][playerX] === 0) {
+                    playerY--;
+                    moved = true;
+                }
+                if (keys['ArrowDown'] && playerY < MAZE_HEIGHT - 1 && maze[playerY + 1][playerX] === 0) {
+                    playerY++;
+                    moved = true;
+                }
+                if (keys['ArrowLeft'] && playerX > 0 && maze[playerY][playerX - 1] === 0) {
+                    playerX--;
+                    moved = true;
+                }
+                if (keys['ArrowRight'] && playerX < MAZE_WIDTH - 1 && maze[playerY][playerX + 1] === 0) {
+                    playerX++;
+                    moved = true;
+                }
+
+                if (moved && !started) {
+                    started = true;
+                    startTime = Date.now();
+                }
+            }
+
+            if (playerX === goalX && playerY === goalY && !gameOver) {
+                gameOver = true;
+                elapsedTime = startTime ? (Date.now() - startTime) / 1000 : 0;
+            }
+        }
+
+        function gameLoop() {
+            update();
+            drawGame();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function init() {
+            canvas = document.getElementById('gameCanvas');
+            canvas.width = WIDTH;
+            canvas.height = HEIGHT;
+            ctx = canvas.getContext('2d');
+
+            document.addEventListener('keydown', (e) => {
+                keys[e.key] = true;
+            });
+
+            document.addEventListener('keyup', (e) => {
+                keys[e.key] = false;
+            });
+
+            canvas.addEventListener('click', (e) => {
+                if (gameOver) {
+                    const rect = canvas.getBoundingClientRect();
+                    const mx = e.clientX - rect.left;
+                    const my = e.clientY - rect.top;
+
+                    if (mx >= WIDTH / 2 - 80 && mx <= WIDTH / 2 + 80 &&
+                        my >= HEIGHT - 60 && my <= HEIGHT - 20) {
+                        resetGame();
+                    }
+                }
+            });
+
+            resetGame();
+            gameLoop();
+        }
+
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>
