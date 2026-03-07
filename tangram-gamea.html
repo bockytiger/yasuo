@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TANGRAM</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#1a1410;--wd:#2d1f0e;--wm:#3d2b12;--wl:#5c3d1a;--gold:#c8a84b;--gdim:#7a6228;--ivd:#c9bc9a;--tx:#e8d9b5}
+body{background:var(--bg);background-image:radial-gradient(ellipse at 20% 50%,rgba(80,40,5,.3) 0%,transparent 50%),radial-gradient(ellipse at 80% 50%,rgba(5,30,20,.3) 0%,transparent 50%);min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'DM Mono',monospace;color:var(--tx);user-select:none}
+header{text-align:center;margin-bottom:14px}
+h1{font-family:'Playfair Display',serif;font-size:clamp(20px,3.5vw,34px);font-weight:400;letter-spacing:.3em;color:var(--gold);text-shadow:0 0 30px rgba(200,168,75,.4)}
+.sub{font-size:10px;letter-spacing:.2em;color:var(--ivd);margin-top:4px;text-transform:uppercase}
+.wrap{display:flex;gap:14px;align-items:flex-start}
+.side{width:160px;display:flex;flex-direction:column;gap:10px}
+.box{background:linear-gradient(135deg,var(--wd),var(--wm));border:1px solid var(--gdim);border-radius:4px;padding:12px;box-shadow:inset 0 1px 0 rgba(200,168,75,.15),0 4px 20px rgba(0,0,0,.7)}
+.box h3{font-family:'Playfair Display',serif;font-size:10px;letter-spacing:.2em;color:var(--gold);margin-bottom:9px;text-transform:uppercase}
+.ki{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.key{background:var(--wl);border:1px solid var(--gdim);color:var(--gold);font-size:9px;padding:1px 5px;border-radius:2px;white-space:nowrap}
+.kd{font-size:9px;color:var(--ivd)}
+.hl{font-size:9px;color:var(--ivd);line-height:1.8;opacity:.8}
+.leg{display:flex;flex-direction:column;gap:5px}
+.lr{display:flex;align-items:center;gap:7px;font-size:9px;color:var(--ivd)}
+.sw{width:13px;height:13px;border-radius:2px;flex-shrink:0}
+.cw{position:relative}
+canvas{display:block;border-radius:4px;cursor:grab;box-shadow:0 0 0 1px var(--gdim),0 0 40px rgba(0,0,0,.8)}
+canvas:active{cursor:grabbing}
+#sb{background:transparent;border:1px solid var(--gdim);color:var(--ivd);font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.12em;padding:7px 10px;cursor:pointer;text-transform:uppercase;transition:all .2s;border-radius:2px;width:100%;margin-top:6px}
+#sb:hover{border-color:var(--gold);color:var(--tx)}
+</style>
+</head>
+<body>
+<header>
+  <h1>TANGRAM</h1>
+  <p class="sub">七巧板 — 七つのピースで正方形を作れ</p>
+</header>
+<div class="wrap">
+  <div class="side">
+    <div class="box"><h3>Pieces</h3><div class="leg" id="leg"></div></div>
+    <div class="box">
+      <h3>Controls</h3>
+      <div class="ki"><span class="kd">移動</span><span class="key">Drag</span></div>
+      <div class="ki"><span class="kd">回転 5°</span><span class="key">R</span></div>
+      <div class="ki"><span class="kd">逆回転</span><span class="key">⇧R</span></div>
+      <div class="ki"><span class="kd">反転</span><span class="key">F</span></div>
+      <div class="ki"><span class="kd">右クリック</span><span class="key">回転</span></div>
+      <div class="ki"><span class="kd">微調整</span><span class="key">↑↓←→</span></div>
+      <button id="sb">✦ 並べ直す</button>
+    </div>
+    <div class="box"><h3>Goal</h3><p class="hl">7つのピースを全て金枠の中に収めると「完成」！</p></div>
+  </div>
+  <div class="cw">
+    <canvas id="c" width="460" height="570"></canvas>
+  </div>
+</div>
+<script>
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+
+// ── Layout ─────────────────────────────────────────────────────────────────
+const BOARD = 360, OX = 50, OY = 105;
+const TT = OY - 60;            // top tray centre Y
+const TB = OY + BOARD + 60;    // bottom tray centre Y
+
+// ── Piece maths ────────────────────────────────────────────────────────────
+// Unit square = 1×1.  All pieces scale by BOARD pixels.
+//
+//   BL = 1/√2  ≈ 0.7071   (big triangle leg)
+//   ML = 0.5              (medium triangle leg)
+//   SL = 1/(2√2) ≈ 0.3536 (small triangle leg)
+//
+// Parallelogram (corrected):
+//   Long  sides = SL  (= small triangle's equal legs)   ← as requested
+//   Short sides = SL/2  at 45°  → height = SL/(2√2) = 0.125
+//   This gives a clear 2:1 ratio (not a rhombus).
+//
+//   Vertices: [0,0], [SL,0], [SL+0.125, 0.125], [0.125, 0.125]
+
+const S2 = Math.SQRT2;
+const BL = 1 / S2;           // ≈ 0.7071
+const ML = 0.5;
+const SL = 1 / (2 * S2);     // ≈ 0.3536
+const PH = SL / (2 * S2);    // = 0.125  (parallelogram short-side component)
+
+const DEFS = [
+  { id:'big1',  lb:'大三角形①',  f:'#c0392b', s:'#e8755a', pts:[[0,0],[BL,0],[0,BL]] },
+  { id:'big2',  lb:'大三角形②',  f:'#1a6e4a', s:'#3cad7e', pts:[[0,0],[BL,0],[0,BL]] },
+  { id:'med',   lb:'中三角形',    f:'#1e4d8c', s:'#4a8fd4', pts:[[0,0],[ML,0],[0,ML]] },
+  { id:'sml1',  lb:'小三角形①',  f:'#7b3fa0', s:'#b07acc', pts:[[0,0],[SL,0],[0,SL]] },
+  { id:'sml2',  lb:'小三角形②',  f:'#8c6010', s:'#d4a040', pts:[[0,0],[SL,0],[0,SL]] },
+  // Square rotated 45° (diamond), half-diagonal = 0.25
+  { id:'sq',    lb:'正方形',      f:'#1a5c6e', s:'#3aa8c0', pts:[[0.25,0],[0.5,0.25],[0.25,0.5],[0,0.25]] },
+  // Parallelogram:
+  //   long  side = 0.5  (= hypotenuse of small right-isosceles triangle)
+  //   short side = SL   (= legs of small triangle) at 45°
+  //   vertices: [0,0],[0.5,0],[0.75,0.25],[0.25,0.25]
+  { id:'para',  lb:'平行四辺形',  f:'#7a1a3a', s:'#d45880',
+    pts:[[0,0],[0.5,0],[0.75,0.25],[0.25,0.25]] },
+];
+
+// ── Build pieces ────────────────────────────────────────────────────────────
+function cen(pts) {
+  let x = 0, y = 0;
+  pts.forEach(([a,b]) => { x += a; y += b; });
+  return [x / pts.length, y / pts.length];
+}
+
+function mkPiece(d) {
+  const sc = d.pts.map(([x,y]) => [OX + x*BOARD, OY + y*BOARD]);
+  const [cx,cy] = cen(sc);
+  return { ...d, basePoints:sc, cx, cy, angle:0, flipX:1, dx:0, dy:0 };
+}
+
+let pieces = DEFS.map(mkPiece);
+
+// ── Tray layout ─────────────────────────────────────────────────────────────
+function reset() {
+  const bx = [.1,.36,.63,.88], tx = [.15,.5,.85];
+  pieces.forEach((p,i) => {
+    p.dx    = (OX + (i<4 ? bx[i] : tx[i-4]) * BOARD) - p.cx;
+    p.dy    = (i<4 ? TB : TT) - p.cy;
+    p.angle = 0;
+    p.flipX = 1;
+  });
+}
+reset();
+
+// ── Transform ───────────────────────────────────────────────────────────────
+function xf(p) {
+  const { basePoints:bp, cx, cy, angle, flipX, dx, dy } = p;
+  const cos = Math.cos(angle), sin = Math.sin(angle);
+  const pcx = cx+dx, pcy = cy+dy;
+  return bp.map(([bx,by]) => {
+    const x0 = (bx-cx)*flipX, y0 = by-cy;
+    return [x0*cos - y0*sin + pcx,
+            x0*sin + y0*cos + pcy];
+  });
+}
+
+// ── Draw ────────────────────────────────────────────────────────────────────
+function poly(pts) {
+  ctx.beginPath();
+  pts.forEach(([x,y],i) => i ? ctx.lineTo(x,y) : ctx.moveTo(x,y));
+  ctx.closePath();
+}
+
+function drawBoard() {
+  const g = ctx.createLinearGradient(OX,OY,OX+BOARD,OY+BOARD);
+  g.addColorStop(0,'#0c1615'); g.addColorStop(1,'#101f1e');
+  ctx.fillStyle = g;
+  ctx.fillRect(OX, OY, BOARD, BOARD);
+
+  ctx.strokeStyle = 'rgba(200,168,75,.06)';
+  ctx.lineWidth = 0.5;
+  const s = BOARD/8;
+  for (let i=0; i<=8; i++) {
+    ctx.beginPath(); ctx.moveTo(OX+i*s,OY); ctx.lineTo(OX+i*s,OY+BOARD); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(OX,OY+i*s); ctx.lineTo(OX+BOARD,OY+i*s); ctx.stroke();
+  }
+
+  // Gold dashed target border
+  ctx.strokeStyle = 'rgba(200,168,75,.75)';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([8,5]);
+  ctx.strokeRect(OX, OY, BOARD, BOARD);
+  ctx.setLineDash([]);
+
+  // Corner ornaments
+  [[OX,OY],[OX+BOARD,OY],[OX+BOARD,OY+BOARD],[OX,OY+BOARD]].forEach(([x,y]) => {
+    ctx.strokeStyle = 'rgba(200,168,75,.65)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(x + (x===OX?0:-10), y + (y===OY?0:-10), 10, 10);
+  });
+}
+
+function drawTrays() {
+  ctx.fillStyle   = 'rgba(200,168,75,.04)';
+  ctx.strokeStyle = 'rgba(200,168,75,.2)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([5,4]);
+  [OY+BOARD+10, OY-100].forEach(ry => {
+    ctx.beginPath(); ctx.roundRect(OX, ry, BOARD, 90, 4); ctx.fill(); ctx.stroke();
+  });
+  ctx.setLineDash([]);
+  ctx.fillStyle  = 'rgba(200,168,75,.3)';
+  ctx.font       = '8px "DM Mono",monospace';
+  ctx.textAlign  = 'center';
+  ctx.fillText('— PIECES —', OX+BOARD/2, OY+BOARD+23);
+  ctx.fillText('— PIECES —', OX+BOARD/2, OY-88);
+  ctx.textAlign  = 'left';
+}
+
+function drawPiece(p, isSel) {
+  const pts = xf(p);
+  ctx.save();
+
+  ctx.shadowColor = 'rgba(0,0,0,.6)'; ctx.shadowBlur = 12;
+  ctx.shadowOffsetX = 3; ctx.shadowOffsetY = 4;
+  poly(pts); ctx.fillStyle = p.f; ctx.fill();
+  ctx.shadowColor = 'transparent';
+
+  // Shine
+  ctx.save(); poly(pts); ctx.clip();
+  const top = pts.reduce((a,b) => b[1]<a[1]?b:a);
+  const sh = ctx.createLinearGradient(top[0],top[1],top[0],top[1]+55);
+  sh.addColorStop(0,'rgba(255,255,255,.2)'); sh.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle = sh; ctx.fill(); ctx.restore();
+
+  poly(pts); ctx.strokeStyle = p.s; ctx.lineWidth = 1.5; ctx.stroke();
+
+  if (isSel) {
+    poly(pts);
+    ctx.strokeStyle = 'rgba(255,240,130,.8)';
+    ctx.lineWidth = 2.5;
+    ctx.setLineDash([4,3]); ctx.stroke(); ctx.setLineDash([]);
+  }
+  ctx.restore();
+}
+
+// ── Win screen drawn directly on canvas ─────────────────────────────────────
+function drawWin() {
+  // Dim overlay
+  ctx.fillStyle = 'rgba(10,6,2,.88)';
+  ctx.fillRect(0, 0, cv.width, cv.height);
+
+  // Outer glow box
+  ctx.save();
+  ctx.shadowColor = 'rgba(200,168,75,.7)';
+  ctx.shadowBlur  = 40;
+  ctx.strokeStyle = 'rgba(200,168,75,.85)';
+  ctx.lineWidth   = 1.5;
+  const bx = cv.width/2-130, by = cv.height/2-90, bw = 260, bh = 180;
+  ctx.strokeRect(bx, by, bw, bh);
+  ctx.fillStyle = 'rgba(20,12,4,.95)';
+  ctx.fillRect(bx, by, bw, bh);
+  ctx.restore();
+
+  // 完成！ text
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.shadowColor = 'rgba(200,168,75,.8)';
+  ctx.shadowBlur  = 30;
+  ctx.font        = "bold 72px 'Playfair Display',serif";
+  ctx.fillStyle   = '#c8a84b';
+  ctx.fillText('完成！', cv.width/2, cv.height/2 + 10);
+  ctx.restore();
+
+  // Sub text
+  ctx.textAlign  = 'center';
+  ctx.font       = "11px 'DM Mono',monospace";
+  ctx.fillStyle  = 'rgba(200,180,130,.7)';
+  ctx.letterSpacing = '0.15em';
+  ctx.fillText('よくできました', cv.width/2, cv.height/2 + 42);
+
+  // Time
+  ctx.font      = "14px 'DM Mono',monospace";
+  ctx.fillStyle = 'rgba(200,168,75,.9)';
+  const e = Math.floor((Date.now()-startTime)/1000);
+  const timeStr = (Math.floor(e/60) ? Math.floor(e/60)+'分 ' : '') + (e%60) + '秒';
+  ctx.fillText(timeStr, cv.width/2, cv.height/2 + 70);
+
+  // Restart button hint
+  ctx.font      = "9px 'DM Mono',monospace";
+  ctx.fillStyle = 'rgba(200,168,75,.45)';
+  ctx.fillText('[ クリックしてもう一度 ]', cv.width/2, cv.height/2 + 100);
+  ctx.textAlign = 'left';
+}
+
+function render() {
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.fillStyle = '#12100d';
+  ctx.fillRect(0, 0, cv.width, cv.height);
+  drawTrays();
+  drawBoard();
+  pieces.forEach(p => drawPiece(p, p === selPiece));
+  if (won) drawWin();
+}
+
+// ── Hit test ────────────────────────────────────────────────────────────────
+function pip(x, y, pts) {
+  let inside = false;
+  for (let i=0, j=pts.length-1; i<pts.length; j=i++) {
+    const [xi,yi]=pts[i],[xj,yj]=pts[j];
+    if (((yi>y)!==(yj>y)) && x<((xj-xi)*(y-yi)/(yj-yi+1e-9)+xi))
+      inside = !inside;
+  }
+  return inside;
+}
+
+// ── Win check ────────────────────────────────────────────────────────────────
+const SIL = [[OX,OY],[OX+BOARD,OY],[OX+BOARD,OY+BOARD],[OX,OY+BOARD]];
+let startTime = Date.now(), won = false;
+
+function checkWin() {
+  if (won) return;
+  for (const p of pieces) {
+    const pts = xf(p);
+    const [cx,cy] = cen(pts);
+    if (!pip(cx,cy,SIL)) return;
+    const inside = pts.filter(([x,y]) => pip(x,y,SIL)).length;
+    if (inside < Math.ceil(pts.length * 0.55)) return;
+  }
+  won = true;
+  render(); // draw win screen immediately
+}
+
+// ── Input ────────────────────────────────────────────────────────────────────
+let drag=null, selPiece=null, dox=0, doy=0;
+
+function getPos(e) {
+  const r = cv.getBoundingClientRect(), t = e.touches ? e.touches[0] : e;
+  return [t.clientX-r.left, t.clientY-r.top];
+}
+function front(p) { const i=pieces.indexOf(p); if(i!==-1) pieces.push(pieces.splice(i,1)[0]); }
+
+cv.addEventListener('mousedown', e => {
+  e.preventDefault();
+
+  // If won, any click restarts
+  if (won) { restart(); return; }
+
+  const [x,y] = getPos(e);
+  for (let i=pieces.length-1; i>=0; i--) {
+    if (pip(x,y,xf(pieces[i]))) {
+      drag = selPiece = pieces[i];
+      dox = x-(drag.cx+drag.dx); doy = y-(drag.cy+drag.dy);
+      front(drag); render(); return;
+    }
+  }
+  selPiece = null; render();
+});
+
+cv.addEventListener('mousemove', e => {
+  if (!drag) return;
+  const [x,y] = getPos(e);
+  drag.dx = x-drag.cx-dox; drag.dy = y-drag.cy-doy; render();
+});
+cv.addEventListener('mouseup',    () => { if (drag) { drag=null; checkWin(); render(); } });
+cv.addEventListener('mouseleave', () => { drag=null; });
+
+cv.addEventListener('touchstart', e => {
+  e.preventDefault();
+  if (won) { restart(); return; }
+  const [x,y] = getPos(e);
+  for (let i=pieces.length-1; i>=0; i--) {
+    if (pip(x,y,xf(pieces[i]))) {
+      drag = selPiece = pieces[i];
+      dox = x-(drag.cx+drag.dx); doy = y-(drag.cy+drag.dy);
+      front(drag); render(); return;
+    }
+  }
+}, {passive:false});
+cv.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (!drag) return;
+  const [x,y] = getPos(e);
+  drag.dx = x-drag.cx-dox; drag.dy = y-drag.cy-doy; render();
+}, {passive:false});
+cv.addEventListener('touchend', () => { if (drag) { drag=null; checkWin(); render(); } });
+
+cv.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  if (won) return;
+  const [x,y] = getPos(e);
+  for (let i=pieces.length-1; i>=0; i--) {
+    if (pip(x,y,xf(pieces[i]))) {
+      selPiece = pieces[i];
+      pieces[i].angle += Math.PI/36;
+      front(pieces[i]); checkWin(); render(); break;
+    }
+  }
+});
+
+document.addEventListener('keydown', e => {
+  if (won) return;
+  const p = selPiece || (pieces.length ? pieces[pieces.length-1] : null);
+  if (!p) return;
+  if (e.key==='r'||e.key==='R') {
+    p.angle += e.shiftKey ? -Math.PI/36 : Math.PI/36;
+    front(p); checkWin(); render();
+  }
+  if (e.key==='f'||e.key==='F') {
+    p.flipX *= -1; front(p); checkWin(); render();
+  }
+  if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) {
+    e.preventDefault();
+    const s = e.shiftKey ? 1 : 4;
+    if (e.key==='ArrowLeft')  p.dx -= s;
+    if (e.key==='ArrowRight') p.dx += s;
+    if (e.key==='ArrowUp')    p.dy -= s;
+    if (e.key==='ArrowDown')  p.dy += s;
+    checkWin(); render();
+  }
+});
+
+// ── Restart ──────────────────────────────────────────────────────────────────
+function restart() {
+  won = false; selPiece = null; startTime = Date.now();
+  reset(); render();
+}
+
+document.getElementById('sb').addEventListener('click', () => {
+  if (!won) { selPiece=null; reset(); render(); }
+});
+
+// ── Legend ───────────────────────────────────────────────────────────────────
+const legEl = document.getElementById('leg');
+DEFS.forEach(d => {
+  const r = document.createElement('div'); r.className='lr';
+  r.innerHTML = `<div class="sw" style="background:${d.f};border:1px solid ${d.s}"></div>${d.lb}`;
+  legEl.appendChild(r);
+});
+
+render();
+</script>
+</body>
+</html>
