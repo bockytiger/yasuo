@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SpeedGrid 25</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Zen+Kaku+Gothic+New:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2330;
+    --border: #30363d;
+    --text-primary: #e6edf3;
+    --text-muted: #7d8590;
+    --accent: #58a6ff;
+    --accent-dim: #1f3d5c;
+    --success: #3fb950;
+    --success-dim: #0d2818;
+    --warning: #d29922;
+    --danger: #f85149;
+    --danger-dim: #3d0f0e;
+    --next-glow: #58a6ff;
+    --cell-size: clamp(52px, 16vw, 88px);
+    --gap: clamp(6px, 1.5vw, 10px);
+    --radius: 10px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    min-height: 100%;
+    background: var(--bg);
+    color: var(--text-primary);
+    font-family: 'Zen Kaku Gothic New', sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 20px 12px 40px;
+    overflow-x: hidden;
+  }
+
+  /* Background subtle grid pattern */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(88,166,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(88,166,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrapper {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 520px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+  }
+
+  .title {
+    font-family: 'DM Mono', monospace;
+    font-weight: 500;
+    font-size: clamp(22px, 6vw, 32px);
+    letter-spacing: 0.12em;
+    color: var(--accent);
+    text-transform: uppercase;
+    line-height: 1;
+  }
+
+  .subtitle {
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+  }
+
+  /* ── STATS BAR ── */
+  .stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    width: 100%;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    transition: border-color 0.3s;
+  }
+
+  .stat-label {
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    font-family: 'DM Mono', monospace;
+  }
+
+  .stat-value {
+    font-family: 'DM Mono', monospace;
+    font-size: clamp(16px, 4vw, 22px);
+    font-weight: 500;
+    color: var(--text-primary);
+    line-height: 1;
+    transition: color 0.3s;
+  }
+
+  .stat-card.timer-active .stat-value { color: var(--accent); }
+  .stat-card.best .stat-value { color: var(--success); }
+
+  /* ── PROGRESS BAR ── */
+  .progress-wrap {
+    width: 100%;
+    height: 3px;
+    background: var(--surface2);
+    border-radius: 99px;
+    overflow: hidden;
+  }
+
+  .progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--success));
+    border-radius: 99px;
+    width: 0%;
+    transition: width 0.3s ease;
+    box-shadow: 0 0 6px var(--accent);
+  }
+
+  /* ── GRID ── */
+  .grid-container {
+    position: relative;
+    width: 100%;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(5, var(--cell-size));
+    grid-template-rows: repeat(5, var(--cell-size));
+    gap: var(--gap);
+    justify-content: center;
+  }
+
+  .cell {
+    width: var(--cell-size);
+    height: var(--cell-size);
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'DM Mono', monospace;
+    font-size: clamp(17px, 4.5vw, 26px);
+    font-weight: 500;
+    color: var(--text-primary);
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+    transition:
+      background 0.15s,
+      border-color 0.15s,
+      color 0.15s,
+      transform 0.1s,
+      box-shadow 0.15s;
+    -webkit-tap-highlight-color: transparent;
+    outline: none;
+  }
+
+  .cell:hover:not(.clicked):not(.disabled) {
+    background: var(--surface2);
+    border-color: var(--accent);
+    transform: scale(1.04);
+  }
+
+  .cell:active:not(.clicked):not(.disabled) {
+    transform: scale(0.94);
+  }
+
+  /* Clicked cells */
+  .cell.clicked {
+    background: var(--success-dim);
+    border-color: var(--success);
+    color: var(--success);
+    cursor: default;
+    animation: pop 0.18s ease forwards;
+  }
+
+  @keyframes pop {
+    0%   { transform: scale(1); }
+    50%  { transform: scale(1.12); }
+    100% { transform: scale(1); }
+  }
+
+  /* Disabled (game not started) */
+  .cell.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  /* Wrong click ripple overlay */
+  .wrong-flash {
+    position: fixed;
+    inset: 0;
+    background: rgba(248, 81, 73, 0.22);
+    pointer-events: none;
+    z-index: 100;
+    opacity: 0;
+    border: 3px solid rgba(248, 81, 73, 0.6);
+  }
+
+  .wrong-flash.active {
+    animation: flash-red 0.45s ease forwards;
+  }
+
+  @keyframes flash-red {
+    0%   { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
+  /* Cell wrong individual shake */
+  .cell.wrong {
+    animation: shake 0.35s ease;
+    border-color: var(--danger) !important;
+    color: var(--danger) !important;
+    background: var(--danger-dim) !important;
+  }
+
+  @keyframes shake {
+    0%  { transform: translateX(0); }
+    20% { transform: translateX(-5px); }
+    40% { transform: translateX(5px); }
+    60% { transform: translateX(-4px); }
+    80% { transform: translateX(4px); }
+    100%{ transform: translateX(0); }
+  }
+
+  /* ── CLEAR OVERLAY ── */
+  .clear-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(13, 17, 23, 0.88);
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    backdrop-filter: blur(4px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s;
+    z-index: 10;
+  }
+
+  .clear-overlay.show {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .clear-title {
+    font-family: 'DM Mono', monospace;
+    font-size: clamp(20px, 6vw, 30px);
+    color: var(--success);
+    letter-spacing: 0.1em;
+    text-shadow: 0 0 20px rgba(63,185,80,0.5);
+    animation: glow-in 0.5s ease;
+  }
+
+  @keyframes glow-in {
+    0% { opacity: 0; transform: scale(0.8); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+
+  .clear-time {
+    font-family: 'DM Mono', monospace;
+    font-size: clamp(30px, 9vw, 48px);
+    font-weight: 500;
+    color: var(--text-primary);
+    line-height: 1;
+  }
+
+  .clear-badge {
+    font-size: 12px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--warning);
+    background: rgba(210,153,34,0.12);
+    border: 1px solid rgba(210,153,34,0.3);
+    border-radius: 99px;
+    padding: 4px 14px;
+    display: none;
+  }
+
+  .clear-badge.show { display: block; }
+
+  /* ── CONTROLS ── */
+  .controls {
+    display: flex;
+    gap: 10px;
+    width: 100%;
+  }
+
+  .btn {
+    flex: 1;
+    padding: 13px 16px;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--text-primary);
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, transform 0.1s, box-shadow 0.15s;
+    text-transform: uppercase;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .btn:hover {
+    background: var(--surface2);
+    border-color: var(--accent);
+    box-shadow: 0 0 10px rgba(88,166,255,0.15);
+  }
+
+  .btn:active { transform: scale(0.97); }
+
+  .btn.primary {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-dim);
+  }
+
+  .btn.primary:hover {
+    background: rgba(88,166,255,0.2);
+    box-shadow: 0 0 14px rgba(88,166,255,0.3);
+  }
+
+  /* ── INSTRUCTION ── */
+  .instruction {
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    text-align: center;
+    line-height: 1.8;
+  }
+
+  .instruction span { color: var(--accent); }
+
+  /* ── FOOTER ── */
+  .footer {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--border);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-top: 10px;
+  }
+</style>
+</head>
+<body>
+
+<div class="wrong-flash" id="wrongFlash"></div>
+
+<div class="wrapper">
+
+  <div class="header">
+    <div class="title">SpeedGrid 25</div>
+    <div class="subtitle">視覚認知トレーニング</div>
+  </div>
+
+  <div class="stats">
+    <div class="stat-card" id="timerCard">
+      <div class="stat-label">TIME</div>
+      <div class="stat-value" id="timerDisplay">0.00</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">NEXT</div>
+      <div class="stat-value" id="nextDisplay">—</div>
+    </div>
+    <div class="stat-card best">
+      <div class="stat-label">BEST</div>
+      <div class="stat-value" id="bestDisplay">—</div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-bar" id="progressBar"></div>
+  </div>
+
+  <div class="grid-container">
+    <div class="grid" id="grid"></div>
+    <div class="clear-overlay" id="clearOverlay">
+      <div class="clear-title">✓ COMPLETE</div>
+      <div class="clear-time" id="clearTime"></div>
+      <div class="clear-badge" id="clearBadge">★ NEW BEST</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn primary" id="startBtn" onclick="startGame()">START</button>
+    <button class="btn" onclick="resetGame()">RESET</button>
+  </div>
+
+  <div class="instruction" id="instruction">
+    <span>START</span> を押してゲームを開始 · <span>1</span> から順番にクリック
+  </div>
+
+  <div class="footer">SPEEDGRID 25 · VISUAL COGNITION TRAINER</div>
+
+</div>
+
+<script>
+  // ── STATE ──
+  let numbers = [];
+  let nextTarget = 1;
+  let timerInterval = null;
+  let startTime = null;
+  let elapsed = 0;
+  let gameActive = false;
+  let gameStarted = false; // timer started
+
+  const LS_KEY = 'speedgrid25_best';
+
+  // ── INIT ──
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  function getBest() {
+    const v = localStorage.getItem(LS_KEY);
+    return v ? parseFloat(v) : null;
+  }
+
+  function setBest(t) {
+    localStorage.setItem(LS_KEY, t.toFixed(2));
+  }
+
+  function formatTime(t) {
+    return t.toFixed(2) + 's';
+  }
+
+  function renderBest() {
+    const best = getBest();
+    document.getElementById('bestDisplay').textContent = best ? formatTime(best) : '—';
+  }
+
+  // ── GRID BUILD ──
+  function buildGrid() {
+    const grid = document.getElementById('grid');
+    grid.innerHTML = '';
+    numbers = shuffle([...Array(25)].map((_, i) => i + 1));
+
+    numbers.forEach((n, i) => {
+      const cell = document.createElement('div');
+      cell.className = 'cell disabled';
+      cell.id = `cell-${n}`;
+      cell.textContent = n;
+      cell.dataset.num = n;
+      cell.setAttribute('tabindex', '0');
+      cell.addEventListener('click', () => handleClick(n, cell));
+      cell.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') handleClick(n, cell);
+      });
+      grid.appendChild(cell);
+    });
+  }
+
+  // ── GAME FLOW ──
+  function startGame() {
+    buildGrid();
+    nextTarget = 1;
+    elapsed = 0;
+    gameActive = true;
+    gameStarted = false;
+    clearInterval(timerInterval);
+
+    document.getElementById('timerDisplay').textContent = '0.00';
+    document.getElementById('nextDisplay').textContent = '1';
+    document.getElementById('progressBar').style.width = '0%';
+    document.getElementById('clearOverlay').classList.remove('show');
+    document.getElementById('timerCard').classList.remove('timer-active');
+    document.getElementById('startBtn').textContent = 'RESTART';
+    document.getElementById('instruction').innerHTML =
+      '<span>1</span> をクリックしてスタート · 順番に <span>25</span> まで';
+
+    // Enable all cells
+    document.querySelectorAll('.cell').forEach(c => {
+      c.classList.remove('disabled');
+      c.classList.remove('clicked', 'next', 'wrong');
+    });
+
+    // Highlight "1" as next
+    highlightNext();
+  }
+
+  function resetGame() {
+    clearInterval(timerInterval);
+    timerInterval = null;
+    gameActive = false;
+    gameStarted = false;
+    elapsed = 0;
+    nextTarget = 1;
+    document.getElementById('timerDisplay').textContent = '0.00';
+    document.getElementById('nextDisplay').textContent = '—';
+    document.getElementById('progressBar').style.width = '0%';
+    document.getElementById('clearOverlay').classList.remove('show');
+    document.getElementById('timerCard').classList.remove('timer-active');
+    document.getElementById('startBtn').textContent = 'START';
+    document.getElementById('instruction').innerHTML =
+      '<span>START</span> を押してゲームを開始 · <span>1</span> から順番にクリック';
+    buildGrid();
+    document.querySelectorAll('.cell').forEach(c => c.classList.add('disabled'));
+    renderBest();
+  }
+
+  function highlightNext() {
+    document.querySelectorAll('.cell.next').forEach(c => c.classList.remove('next'));
+    const nextCell = document.getElementById(`cell-${nextTarget}`);
+    if (nextCell && !nextCell.classList.contains('clicked')) {
+      nextCell.classList.add('next');
+    }
+  }
+
+  function handleClick(n, cell) {
+    if (!gameActive) return;
+    if (cell.classList.contains('clicked')) return;
+    if (cell.classList.contains('disabled')) return;
+
+    if (n !== nextTarget) {
+      // Wrong click
+      triggerWrongFeedback(cell);
+      return;
+    }
+
+    // Correct click
+    // Start timer on first click (which must be 1)
+    if (!gameStarted && n === 1) {
+      gameStarted = true;
+      startTime = performance.now();
+      timerInterval = setInterval(updateTimer, 33);
+      document.getElementById('timerCard').classList.add('timer-active');
+    }
+
+    cell.classList.remove('next');
+    cell.classList.add('clicked');
+
+    nextTarget++;
+    const progress = ((nextTarget - 1) / 25) * 100;
+    document.getElementById('progressBar').style.width = progress + '%';
+
+    if (nextTarget <= 25) {
+      document.getElementById('nextDisplay').textContent = nextTarget;
+      highlightNext();
+    } else {
+      // Cleared!
+      clearInterval(timerInterval);
+      const finalTime = (performance.now() - startTime) / 1000;
+      elapsed = finalTime;
+      gameActive = false;
+      gameStarted = false;
+
+      document.getElementById('timerDisplay').textContent = formatTime(finalTime);
+      document.getElementById('progressBar').style.width = '100%';
+      document.getElementById('nextDisplay').textContent = '✓';
+      document.getElementById('timerCard').classList.remove('timer-active');
+
+      const best = getBest();
+      let isNewBest = false;
+      if (best === null || finalTime < best) {
+        setBest(finalTime);
+        isNewBest = true;
+        renderBest();
+      }
+
+      // Show overlay
+      setTimeout(() => {
+        document.getElementById('clearTime').textContent = formatTime(finalTime);
+        const badge = document.getElementById('clearBadge');
+        if (isNewBest) badge.classList.add('show');
+        else badge.classList.remove('show');
+        document.getElementById('clearOverlay').classList.add('show');
+      }, 250);
+
+      document.getElementById('instruction').innerHTML =
+        'クリア！ <span>RESTART</span> でもう一度挑戦しよう';
+    }
+  }
+
+  function updateTimer() {
+    if (!startTime) return;
+    const t = (performance.now() - startTime) / 1000;
+    document.getElementById('timerDisplay').textContent = t.toFixed(2);
+  }
+
+  function triggerWrongFeedback(cell) {
+    // Screen flash
+    const flash = document.getElementById('wrongFlash');
+    flash.classList.remove('active');
+    void flash.offsetWidth; // reflow
+    flash.classList.add('active');
+
+    // Cell shake
+    cell.classList.remove('wrong');
+    void cell.offsetWidth;
+    cell.classList.add('wrong');
+    setTimeout(() => cell.classList.remove('wrong'), 400);
+  }
+
+  // ── KEYBOARD SHORTCUT ──
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !gameActive) startGame();
+    if (e.key === 'r' || e.key === 'R') resetGame();
+  });
+
+  // ── INITIAL LOAD ──
+  renderBest();
+  buildGrid();
+  document.querySelectorAll('.cell').forEach(c => c.classList.add('disabled'));
+</script>
+</body>
+</html>
