@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>さめがめ</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap');
+
+    /* ── CSS変数（テーマカラー） ── */
+    :root {
+      --bg:        #0a0a12;
+      --panel:     #12121e;
+      --border:    #2a2a44;
+      --glow-r:    #ff4455;
+      --glow-b:    #3399ff;
+      --glow-g:    #44dd88;
+      --glow-y:    #ffcc22;
+      --text:      #ccccee;
+      --text-dim:  #556677;
+      --cell-gap:  3px;
+      --cell-size: 44px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Zen Kaku Gothic New', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 24px 16px 40px;
+      overflow-x: hidden;
+    }
+
+    /* スキャンラインオーバーレイ */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.07) 2px,
+        rgba(0,0,0,0.07) 4px
+      );
+      pointer-events: none;
+      z-index: 999;
+    }
+
+    /* ── ヘッダー ── */
+    header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    h1 {
+      font-family: 'Press Start 2P', monospace;
+      font-size: clamp(18px, 4vw, 28px);
+      letter-spacing: 4px;
+      color: #fff;
+      text-shadow:
+        0 0 10px var(--glow-b),
+        0 0 30px var(--glow-b),
+        0 0 60px rgba(51,153,255,0.3);
+      margin-bottom: 6px;
+    }
+    .subtitle {
+      font-size: 12px;
+      color: var(--text-dim);
+      letter-spacing: 2px;
+    }
+
+    /* ── メインレイアウト ── */
+    .game-wrap {
+      display: flex;
+      gap: 24px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    /* ── ゲームボード ── */
+    #board-container {
+      position: relative;
+    }
+    #board {
+      display: grid;
+      /* 15列 */
+      grid-template-columns: repeat(15, var(--cell-size));
+      grid-template-rows: repeat(10, var(--cell-size));
+      gap: var(--cell-gap);
+      background: var(--panel);
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,0.04),
+        0 8px 40px rgba(0,0,0,0.6),
+        inset 0 1px 0 rgba(255,255,255,0.06);
+    }
+
+    /* ── 個々のセル ── */
+    .cell {
+      width: var(--cell-size);
+      height: var(--cell-size);
+      border-radius: 5px;
+      cursor: default;
+      position: relative;
+      transition: transform 0.08s ease, filter 0.08s ease;
+    }
+
+    /* 空セル */
+    .cell.empty {
+      background: transparent;
+      cursor: default;
+    }
+
+    /* 色別スタイル */
+    .cell.red {
+      background: linear-gradient(135deg, #ff6670 0%, #cc2233 60%, #991122 100%);
+      box-shadow: 0 3px 0 #771122, 0 0 8px rgba(255,68,85,0.4);
+      border-top: 2px solid #ff9999;
+      border-left: 2px solid #ff8888;
+      cursor: pointer;
+    }
+    .cell.blue {
+      background: linear-gradient(135deg, #66aaff 0%, #2266cc 60%, #113388 100%);
+      box-shadow: 0 3px 0 #112277, 0 0 8px rgba(51,153,255,0.4);
+      border-top: 2px solid #99ccff;
+      border-left: 2px solid #88bbff;
+      cursor: pointer;
+    }
+    .cell.green {
+      background: linear-gradient(135deg, #66ee99 0%, #22aa55 60%, #116633 100%);
+      box-shadow: 0 3px 0 #115533, 0 0 8px rgba(68,221,136,0.4);
+      border-top: 2px solid #99ffcc;
+      border-left: 2px solid #88ffbb;
+      cursor: pointer;
+    }
+    .cell.yellow {
+      background: linear-gradient(135deg, #ffee66 0%, #ccaa00 60%, #997700 100%);
+      box-shadow: 0 3px 0 #775500, 0 0 8px rgba(255,204,34,0.4);
+      border-top: 2px solid #ffff99;
+      border-left: 2px solid #ffee88;
+      cursor: pointer;
+    }
+
+    /* ホバー: 消去可能グループを持つセルのみ光らせる */
+    .cell.clickable:hover {
+      transform: translateY(-2px) scale(1.08);
+      filter: brightness(1.3);
+      z-index: 10;
+    }
+    /* ハイライト（同グループ表示） */
+    .cell.highlight {
+      filter: brightness(1.5);
+      transform: scale(1.06);
+      z-index: 5;
+      animation: pulse 0.5s ease infinite alternate;
+    }
+    @keyframes pulse {
+      from { filter: brightness(1.4); }
+      to   { filter: brightness(1.9); }
+    }
+
+    /* 消去アニメーション */
+    .cell.removing {
+      animation: pop 0.25s ease forwards;
+    }
+    @keyframes pop {
+      0%   { transform: scale(1);    opacity: 1; }
+      50%  { transform: scale(1.3);  opacity: 0.8; }
+      100% { transform: scale(0);    opacity: 0; }
+    }
+
+    /* 落下アニメーション */
+    .cell.falling {
+      animation: fall 0.18s ease-out;
+    }
+    @keyframes fall {
+      from { transform: translateY(-10px); opacity: 0.6; }
+      to   { transform: translateY(0);     opacity: 1; }
+    }
+
+    /* ── サイドパネル ── */
+    .side-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      min-width: 180px;
+    }
+
+    .panel-box {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    }
+
+    .panel-label {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 8px;
+      color: var(--text-dim);
+      letter-spacing: 2px;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+
+    .panel-value {
+      font-family: 'Press Start 2P', monospace;
+      font-size: clamp(16px, 3vw, 22px);
+      color: #fff;
+      text-shadow: 0 0 12px var(--glow-y), 0 0 30px rgba(255,204,34,0.2);
+    }
+
+    /* スコア加点アニメーション */
+    #score-delta {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 13px;
+      color: var(--glow-y);
+      height: 20px;
+      text-shadow: 0 0 10px var(--glow-y);
+      transition: opacity 0.5s;
+      opacity: 0;
+    }
+    #score-delta.show {
+      opacity: 1;
+      animation: rise 0.8s ease forwards;
+    }
+    @keyframes rise {
+      from { transform: translateY(0);    opacity: 1; }
+      to   { transform: translateY(-16px); opacity: 0; }
+    }
+
+    /* ── ボタン ── */
+    .btn {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 9px;
+      letter-spacing: 1px;
+      padding: 12px 18px;
+      border: 2px solid var(--border);
+      border-radius: 6px;
+      background: rgba(255,255,255,0.05);
+      color: var(--text);
+      cursor: pointer;
+      width: 100%;
+      transition: background 0.15s, border-color 0.15s, transform 0.1s;
+    }
+    .btn:hover {
+      background: rgba(255,255,255,0.1);
+      border-color: rgba(255,255,255,0.3);
+      transform: translateY(-1px);
+    }
+    .btn:active { transform: translateY(1px); }
+    .btn.primary {
+      border-color: var(--glow-b);
+      color: var(--glow-b);
+      box-shadow: 0 0 12px rgba(51,153,255,0.2);
+    }
+    .btn.primary:hover {
+      background: rgba(51,153,255,0.12);
+      box-shadow: 0 0 20px rgba(51,153,255,0.4);
+    }
+
+    /* ── ヒントテキスト ── */
+    #hint {
+      font-size: 11px;
+      color: var(--text-dim);
+      text-align: center;
+      line-height: 1.7;
+    }
+    #hint span {
+      color: var(--glow-g);
+    }
+
+    /* ── ゲームオーバーオーバーレイ ── */
+    #overlay {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: rgba(10,10,18,0.88);
+      border-radius: 6px;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      backdrop-filter: blur(4px);
+    }
+    #overlay.active { display: flex; }
+
+    #overlay-title {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 18px;
+      color: var(--glow-r);
+      text-shadow: 0 0 20px var(--glow-r);
+      animation: flicker 1.5s infinite;
+    }
+    @keyframes flicker {
+      0%,100% { opacity:1; }
+      92%      { opacity:1; }
+      93%      { opacity:0.3; }
+      94%      { opacity:1; }
+      96%      { opacity:0.5; }
+      97%      { opacity:1; }
+    }
+    #overlay-score {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 13px;
+      color: var(--glow-y);
+    }
+    #overlay-msg {
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>さめがめ</h1>
+  <p class="subtitle">SAME GAME &mdash; RETRO EDITION</p>
+</header>
+
+<div class="game-wrap">
+
+  <!-- ゲームボード -->
+  <div id="board-container">
+    <div id="board"></div>
+    <!-- ゲームオーバーオーバーレイ -->
+    <div id="overlay">
+      <div id="overlay-title">GAME OVER</div>
+      <div id="overlay-score"></div>
+      <div id="overlay-msg">消せるブロックがありません</div>
+    </div>
+  </div>
+
+  <!-- サイドパネル -->
+  <div class="side-panel">
+
+    <div class="panel-box">
+      <div class="panel-label">SCORE</div>
+      <div class="panel-value" id="score-val">0</div>
+      <div id="score-delta"></div>
+    </div>
+
+    <div class="panel-box">
+      <div class="panel-label">REMAINING</div>
+      <div class="panel-value" id="remaining-val">150</div>
+    </div>
+
+    <button class="btn primary" id="btn-reset">▶ リセット (R)</button>
+
+    <div class="panel-box" id="hint">
+      同じ色が<span>2個以上</span>つながった<br>ブロックをクリック！<br><br>
+      一度に消すほど<span>高得点</span>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   さめがめ (SameGame) — JavaScript実装
+   ============================================================ */
+
+// ── 定数 ──────────────────────────────────────────────────────
+const ROWS   = 10;   // 行数
+const COLS   = 15;   // 列数
+const COLORS = ['red', 'blue', 'green', 'yellow']; // 色一覧
+
+// ============================================================
+// SameGame クラス：ゲームのすべての状態とロジックを管理
+// ============================================================
+class SameGame {
+  constructor() {
+    // 盤面：2次元配列（null = 空、文字列 = 色名）
+    this.grid = [];
+    this.score = 0;
+    this.init();
+  }
+
+  // ── 初期化（盤面をランダムに生成） ──────────────────────────
+  init() {
+    this.score = 0;
+    this.grid = [];
+    for (let r = 0; r < ROWS; r++) {
+      const row = [];
+      for (let c = 0; c < COLS; c++) {
+        // ランダムに4色のいずれかを配置
+        row.push(COLORS[Math.floor(Math.random() * COLORS.length)]);
+      }
+      this.grid.push(row);
+    }
+  }
+
+  // ── 残りブロック数を返す ─────────────────────────────────────
+  remaining() {
+    let count = 0;
+    for (let r = 0; r < ROWS; r++)
+      for (let c = 0; c < COLS; c++)
+        if (this.grid[r][c] !== null) count++;
+    return count;
+  }
+
+  // ── 指定セルと同色で連結するグループを取得（BFS） ───────────
+  // 再帰の代わりにスタックを使用したDFS実装
+  getGroup(row, col) {
+    const color = this.grid[row][col];
+    if (!color) return []; // 空セルはグループなし
+
+    const visited = new Set();
+    const stack   = [[row, col]];
+    const group   = [];
+
+    while (stack.length > 0) {
+      const [r, c] = stack.pop();
+      const key = `${r},${c}`;
+      if (visited.has(key)) continue;
+      if (r < 0 || r >= ROWS || c < 0 || c >= COLS) continue;
+      if (this.grid[r][c] !== color) continue;
+
+      visited.add(key);
+      group.push([r, c]);
+
+      // 上下左右の隣接セルをスタックに積む
+      stack.push([r-1, c], [r+1, c], [r, c-1], [r, c+1]);
+    }
+    return group;
+  }
+
+  // ── グループを消去してスコアを加算 ──────────────────────────
+  // 戻り値：加算したスコア（消せない場合は0）
+  remove(row, col) {
+    const group = this.getGroup(row, col);
+    if (group.length < 2) return 0; // 1個では消せない
+
+    // 消去：nullをセット
+    for (const [r, c] of group) {
+      this.grid[r][c] = null;
+    }
+
+    // スコア計算：(個数-2)^2
+    const n    = group.length;
+    const gain = Math.pow(n - 2, 2);
+    this.score += gain;
+
+    // 落下・左詰め処理
+    this.applyGravity();
+    this.compactLeft();
+
+    return gain;
+  }
+
+  // ── 落下処理：各列で空きを詰める（下から） ──────────────────
+  applyGravity() {
+    for (let c = 0; c < COLS; c++) {
+      // 列を下から上へスキャンして非空要素だけ集める
+      const blocks = [];
+      for (let r = ROWS - 1; r >= 0; r--) {
+        if (this.grid[r][c] !== null) blocks.push(this.grid[r][c]);
+      }
+      // 下から詰めて上は null にする
+      for (let r = 0; r < ROWS; r++) {
+        const fromBottom = ROWS - 1 - r;
+        this.grid[fromBottom][c] = blocks[r] ?? null;
+      }
+    }
+  }
+
+  // ── 左詰め処理：空列を右の列で埋める ────────────────────────
+  compactLeft() {
+    // 空でない列だけを左から詰める
+    const nonEmpty = [];
+    for (let c = 0; c < COLS; c++) {
+      // 列の中に1つでもブロックがあれば非空とみなす
+      const hasBlock = this.grid.some(row => row[c] !== null);
+      if (hasBlock) nonEmpty.push(c);
+    }
+
+    // 新しい盤面を構築
+    const newGrid = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+    nonEmpty.forEach((origCol, newCol) => {
+      for (let r = 0; r < ROWS; r++) {
+        newGrid[r][newCol] = this.grid[r][origCol];
+      }
+    });
+    this.grid = newGrid;
+  }
+
+  // ── ゲームオーバー判定：消せるグループがあるか ──────────────
+  isGameOver() {
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        if (this.grid[r][c] !== null) {
+          const group = this.getGroup(r, c);
+          if (group.length >= 2) return false; // まだ消せる
+        }
+      }
+    }
+    return true; // 消せるブロックがない
+  }
+}
+
+/* ============================================================
+   UI クラス：DOMの描画・イベント管理
+   ============================================================ */
+class UI {
+  constructor() {
+    this.game        = new SameGame();
+    this.boardEl     = document.getElementById('board');
+    this.scoreEl     = document.getElementById('score-val');
+    this.remainEl    = document.getElementById('remaining-val');
+    this.deltaEl     = document.getElementById('score-delta');
+    this.overlayEl   = document.getElementById('overlay');
+    this.overlayScore= document.getElementById('overlay-score');
+    this.cells       = []; // DOM要素の2次元配列
+    this.highlighted = []; // 現在ハイライト中のセル座標
+
+    this._buildBoard();
+    this._bindEvents();
+    this.render();
+  }
+
+  // ── DOM上のセルグリッドを生成 ────────────────────────────────
+  _buildBoard() {
+    this.boardEl.innerHTML = '';
+    this.cells = [];
+    for (let r = 0; r < ROWS; r++) {
+      const row = [];
+      for (let c = 0; c < COLS; c++) {
+        const el = document.createElement('div');
+        el.className = 'cell';
+        el.dataset.r = r;
+        el.dataset.c = c;
+        this.boardEl.appendChild(el);
+        row.push(el);
+      }
+      this.cells.push(row);
+    }
+  }
+
+  // ── イベントバインド ─────────────────────────────────────────
+  _bindEvents() {
+    // クリック：ブロック消去
+    this.boardEl.addEventListener('click', e => {
+      const el = e.target.closest('.cell');
+      if (!el) return;
+      this._onClick(+el.dataset.r, +el.dataset.c);
+    });
+
+    // ホバー：グループをハイライト
+    this.boardEl.addEventListener('mouseover', e => {
+      const el = e.target.closest('.cell');
+      if (!el) return;
+      this._onHover(+el.dataset.r, +el.dataset.c);
+    });
+    this.boardEl.addEventListener('mouseleave', () => {
+      this._clearHighlight();
+    });
+
+    // リセットボタン
+    document.getElementById('btn-reset').addEventListener('click', () => this.reset());
+
+    // Rキーでリセット
+    document.addEventListener('keydown', e => {
+      if (e.key === 'r' || e.key === 'R') this.reset();
+    });
+  }
+
+  // ── セルクリック処理 ─────────────────────────────────────────
+  _onClick(r, c) {
+    if (this.game.grid[r][c] === null) return;
+    const group = this.game.getGroup(r, c);
+    if (group.length < 2) return;
+
+    // 消去アニメーションを付与してから盤面を更新
+    for (const [gr, gc] of group) {
+      this.cells[gr][gc].classList.add('removing');
+    }
+
+    setTimeout(() => {
+      const gain = this.game.remove(r, c);
+      this._showDelta(gain);
+      this.render(true); // falling アニメ付きで再描画
+      this._updateHUD();
+
+      // ゲームオーバーチェック
+      if (this.game.isGameOver()) {
+        setTimeout(() => {
+          this.overlayScore.textContent = `SCORE: ${this.game.score}`;
+          this.overlayEl.classList.add('active');
+        }, 350);
+      }
+    }, 220);
+  }
+
+  // ── ホバー時のグループハイライト ────────────────────────────
+  _onHover(r, c) {
+    this._clearHighlight();
+    const color = this.game.grid[r][c];
+    if (!color) return;
+    const group = this.game.getGroup(r, c);
+    if (group.length < 2) return;
+
+    this.highlighted = group;
+    for (const [gr, gc] of group) {
+      this.cells[gr][gc].classList.add('highlight');
+    }
+  }
+
+  // ── ハイライト解除 ───────────────────────────────────────────
+  _clearHighlight() {
+    for (const [r, c] of this.highlighted) {
+      if (this.cells[r] && this.cells[r][c]) {
+        this.cells[r][c].classList.remove('highlight');
+      }
+    }
+    this.highlighted = [];
+  }
+
+  // ── スコア加点表示 ───────────────────────────────────────────
+  _showDelta(gain) {
+    if (gain <= 0) return;
+    this.deltaEl.textContent = `+${gain}`;
+    this.deltaEl.classList.remove('show');
+    void this.deltaEl.offsetWidth; // リフロー強制（アニメ再起動）
+    this.deltaEl.classList.add('show');
+  }
+
+  // ── HUD（スコア・残り数）更新 ────────────────────────────────
+  _updateHUD() {
+    this.scoreEl.textContent   = this.game.score.toLocaleString();
+    this.remainEl.textContent  = this.game.remaining();
+  }
+
+  // ── 盤面を再描画 ─────────────────────────────────────────────
+  render(withFall = false) {
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const el    = this.cells[r][c];
+        const color = this.game.grid[r][c];
+
+        // クラスを一旦リセット
+        el.className = 'cell';
+
+        if (color) {
+          el.classList.add(color);
+          // グループサイズが2以上なら clickable クラスを付与
+          const grp = this.game.getGroup(r, c);
+          if (grp.length >= 2) el.classList.add('clickable');
+          // 落下アニメ
+          if (withFall) el.classList.add('falling');
+        } else {
+          el.classList.add('empty');
+        }
+      }
+    }
+    this._updateHUD();
+  }
+
+  // ── リセット ─────────────────────────────────────────────────
+  reset() {
+    this.overlayEl.classList.remove('active');
+    this._clearHighlight();
+    this.game.init();
+    this.render();
+    this._updateHUD();
+  }
+}
+
+// ── エントリーポイント ──────────────────────────────────────────
+const ui = new UI();
+</script>
+</body>
+</html>
