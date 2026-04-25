@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>壁伸ばし法迷路</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0f;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: 'Courier New', monospace;
+    color: #e0e0e0;
+  }
+  h1 {
+    font-size: 1.1rem;
+    letter-spacing: 0.25em;
+    color: #7efff5;
+    margin-bottom: 10px;
+    text-shadow: 0 0 12px #7efff588;
+  }
+  #hint {
+    font-size: 0.7rem;
+    color: #555;
+    margin-bottom: 8px;
+    letter-spacing: 0.1em;
+  }
+  canvas {
+    display: block;
+    border: 1px solid #222;
+    image-rendering: pixelated;
+  }
+  #overlay {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    pointer-events: none;
+  }
+  .overlay-msg {
+    font-size: 1.1rem;
+    letter-spacing: 0.2em;
+    color: #7efff5;
+    text-shadow: 0 0 16px #7efff5aa;
+  }
+  .btn-row { display: flex; gap: 16px; pointer-events: all; }
+  .btn {
+    padding: 10px 28px;
+    border: none;
+    border-radius: 2px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: opacity 0.15s, box-shadow 0.15s;
+    pointer-events: all;
+  }
+  .btn:hover { opacity: 0.85; box-shadow: 0 0 10px #7efff566; }
+  .btn-start  { background: #1a7f6e; color: #e0ffe8; }
+  .btn-retry  { background: #1a7f6e; color: #e0ffe8; }
+  .btn-end    { background: #7f1a2a; color: #ffe0e0; }
+  #canvas-wrap { position: relative; }
+</style>
+</head>
+<body>
+<h1>壁 伸 ば し 法 迷 路</h1>
+<div id="hint">← → ↑ ↓ キーで移動　①②③④⑤を順に通ってゴール(赤)へ</div>
+<div id="canvas-wrap">
+  <canvas id="c"></canvas>
+  <div id="overlay">
+    <div id="overlay-msg" class="overlay-msg" style="display:none"></div>
+    <div class="btn-row" id="btn-row">
+      <button class="btn btn-start" id="btn-start">スタート</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const CELL = 14;
+const COLS = Math.floor(800 / CELL);
+const ROWS = Math.floor(600 / CELL);
+const W = COLS * CELL, H = ROWS * CELL;
+
+const canvas = document.getElementById('c');
+canvas.width = W; canvas.height = H;
+const ctx = canvas.getContext('2d');
+
+// ─── 迷路生成（壁伸ばし法・再帰版）─────────────────────────────
+function generateMaze() {
+  const maze = Array.from({length: ROWS}, () => new Uint8Array(COLS).fill(1));
+
+  function extend(r, c) {
+    const dirs = [[0,2],[0,-2],[2,0],[-2,0]].sort(() => Math.random()-0.5);
+    for (const [dr, dc] of dirs) {
+      const nr = r+dr, nc = c+dc;
+      if (nr>0 && nr<ROWS-1 && nc>0 && nc<COLS-1 && maze[nr][nc]===1) {
+        maze[nr][nc] = 0;
+        maze[r+dr/2|0][c+dc/2|0] = 0;
+        extend(nr, nc);
+      }
+    }
+  }
+
+  maze[1][1] = 0;
+  // 再帰深さ対策：スタックをシミュレートするイテレータ版に切り替え
+  const stack = [[1,1]];
+  while (stack.length) {
+    const [r,c] = stack[stack.length-1];
+    const dirs = [[0,2],[0,-2],[2,0],[-2,0]].sort(() => Math.random()-0.5);
+    let moved = false;
+    for (const [dr,dc] of dirs) {
+      const nr=r+dr, nc=c+dc;
+      if (nr>0 && nr<ROWS-1 && nc>0 && nc<COLS-1 && maze[nr][nc]===1) {
+        maze[nr][nc]=0;
+        maze[r+dr/2|0][c+dc/2|0]=0;
+        stack.push([nr,nc]);
+        moved=true;
+        break;
+      }
+    }
+    if (!moved) stack.pop();
+  }
+  return maze;
+}
+
+// ─── BFS ─────────────────────────────────────────────────────────
+function bfs(maze, start) {
+  const visited = new Uint8Array(ROWS*COLS);
+  const path = [];
+  const queue = [start];
+  visited[start[0]*COLS+start[1]] = 1;
+  while (queue.length) {
+    const [r,c] = queue.shift();
+    path.push([r,c]);
+    for (const [dr,dc] of [[0,1],[1,0],[0,-1],[-1,0]]) {
+      const nr=r+dr, nc=c+dc;
+      if (nr>=0&&nr<ROWS&&nc>=0&&nc<COLS&&maze[nr][nc]===0&&!visited[nr*COLS+nc]) {
+        visited[nr*COLS+nc]=1;
+        queue.push([nr,nc]);
+      }
+    }
+  }
+  return path;
+}
+
+// ─── 描画 ─────────────────────────────────────────────────────────
+const CP_LABELS = ['①','②','③','④','⑤'];
+
+function draw(maze, start, goal, checkpoints, player, cpIdx) {
+  // 背景・迷路
+  ctx.fillStyle = '#e8e8ec';
+  ctx.fillRect(0,0,W,H);
+  ctx.fillStyle = '#1a1a24';
+  for (let r=0; r<ROWS; r++)
+    for (let c=0; c<COLS; c++)
+      if (maze[r][c]===1)
+        ctx.fillRect(c*CELL, r*CELL, CELL, CELL);
+
+  // スタート
+  ctx.fillStyle = '#2ecc71';
+  ctx.fillRect(start[1]*CELL, start[0]*CELL, CELL, CELL);
+
+  // ゴール
+  ctx.fillStyle = '#e74c3c';
+  ctx.fillRect(goal[1]*CELL, goal[0]*CELL, CELL, CELL);
+
+  // チェックポイント
+  for (let i=0; i<checkpoints.length; i++) {
+    const [r,c] = checkpoints[i];
+    const passed = i < cpIdx;
+    ctx.fillStyle = passed ? '#27ae60' : '#3498db';
+    ctx.fillRect(c*CELL, r*CELL, CELL, CELL);
+    ctx.fillStyle = '#fff';
+    ctx.font = `bold ${CELL-3}px 'Courier New'`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(CP_LABELS[i], c*CELL+CELL/2, r*CELL+CELL/2+1);
+  }
+
+  // プレイヤー
+  const [pr,pc] = player;
+  ctx.fillStyle = '#f39c12';
+  ctx.beginPath();
+  ctx.arc(pc*CELL+CELL/2, pr*CELL+CELL/2, CELL/2-1, 0, Math.PI*2);
+  ctx.fill();
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+}
+
+// ─── ゲーム状態 ───────────────────────────────────────────────────
+let maze, start, goal, checkpoints, player, cpIdx;
+let state = 'idle'; // idle | playing | cleared
+
+const overlayMsg = document.getElementById('overlay-msg');
+const btnRow     = document.getElementById('btn-row');
+
+function initGame() {
+  maze = generateMaze();
+  start = [1,1];
+  const path = bfs(maze, start);
+  const step = (path.length / 7) | 0;
+  checkpoints = [1,2,3,4,5].map(i => path[i*step]);
+  goal = path[6*step];
+  player = [...start];
+  cpIdx = 0;
+  state = 'idle';
+  overlayMsg.style.display = 'none';
+  btnRow.innerHTML = '<button class="btn btn-start" id="btn-start">スタート</button>';
+  document.getElementById('btn-start').onclick = startGame;
+  draw(maze, start, goal, checkpoints, player, cpIdx);
+}
+
+function startGame() {
+  state = 'playing';
+  overlayMsg.style.display = 'none';
+  btnRow.innerHTML = '';
+  draw(maze, start, goal, checkpoints, player, cpIdx);
+}
+
+function showCleared() {
+  state = 'cleared';
+  overlayMsg.textContent = '🎉  ゴール！クリア！';
+  overlayMsg.style.display = '';
+  btnRow.innerHTML = `
+    <button class="btn btn-end"   id="btn-end">終わる</button>
+    <button class="btn btn-retry" id="btn-retry">もう一度</button>`;
+  document.getElementById('btn-end').onclick   = () => { btnRow.innerHTML=''; overlayMsg.textContent='またね！'; };
+  document.getElementById('btn-retry').onclick = initGame;
+}
+
+// ─── キーボード ───────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (state !== 'playing') return;
+  const moves = {ArrowUp:[-1,0], ArrowDown:[1,0], ArrowLeft:[0,-1], ArrowRight:[0,1]};
+  const m = moves[e.key];
+  if (!m) return;
+  e.preventDefault();
+  const nr = player[0]+m[0], nc = player[1]+m[1];
+  if (nr>=0&&nr<ROWS&&nc>=0&&nc<COLS&&maze[nr][nc]===0) {
+    player = [nr,nc];
+    if (cpIdx < checkpoints.length && nr===checkpoints[cpIdx][0] && nc===checkpoints[cpIdx][1])
+      cpIdx++;
+    if (nr===goal[0] && nc===goal[1] && cpIdx===checkpoints.length)
+      showCleared();
+    draw(maze, start, goal, checkpoints, player, cpIdx);
+  }
+});
+
+// ─── 起動 ─────────────────────────────────────────────────────────
+initGame();
+</script>
+</body>
+</html>
