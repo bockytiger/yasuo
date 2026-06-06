@@ -177,8 +177,7 @@ const NUMS=['①','②','③','④','⑤','⑥'];
    画数が1の文字は書き順チェックなし */
 const STROKE_ORDER={
   'ア':[ {yMin:60,yMax:120,xMin:40,xMax:260},   // ①横棒
-         {yMin:40,yMax:200,xMin:100,xMax:200},   // ②縦棒
-         {yMin:120,yMax:280,xMin:100,xMax:260} ], // ③払い
+         {yMin:40,yMax:280,xMin:40,xMax:260} ],   // ②縦棒＋払い
   'イ':[ {yMin:40,yMax:260,xMin:60,xMax:140},
          {yMin:40,yMax:260,xMin:140,xMax:220} ],
   'ウ':[ {yMin:30,yMax:80,xMin:100,xMax:200},
@@ -236,14 +235,14 @@ const STROKE_ORDER={
          {yMin:30,yMax:280,xMin:40,xMax:270} ],
   'ネ':[ {yMin:55,yMax:115,xMin:40,xMax:260},
          {yMin:30,yMax:200,xMin:100,xMax:200},
-         {yMin:130,yMax:280,xMin:40,xMax:270} ],
+         {yMin:130,yMax:280,xMin:30,xMax:150},
+         {yMin:130,yMax:280,xMin:130,xMax:270} ],
   'ノ':[ {yMin:30,yMax:280,xMin:40,xMax:240} ],
   'ハ':[ {yMin:50,yMax:280,xMin:30,xMax:150},
          {yMin:30,yMax:280,xMin:110,xMax:260} ],
   'ヒ':[ {yMin:30,yMax:280,xMin:50,xMax:150},
          {yMin:60,yMax:270,xMin:50,xMax:270} ],
-  'フ':[ {yMin:50,yMax:110,xMin:40,xMax:270},
-         {yMin:50,yMax:290,xMin:140,xMax:270} ],
+  'フ':[ {yMin:50,yMax:280,xMin:40,xMax:270} ],
   'ヘ':[ {yMin:30,yMax:230,xMin:30,xMax:270} ],
   'ホ':[ {yMin:30,yMax:280,xMin:100,xMax:200},
          {yMin:110,yMax:185,xMin:30,xMax:270},
@@ -262,10 +261,8 @@ const STROKE_ORDER={
          {yMin:115,yMax:185,xMin:40,xMax:260},
          {yMin:50,yMax:260,xMin:80,xMax:200} ],
   'ヤ':[ {yMin:55,yMax:120,xMin:100,xMax:270},
-         {yMin:30,yMax:280,xMin:30,xMax:180},
-         {yMin:30,yMax:280,xMin:100,xMax:200} ],
-  'ユ':[ {yMin:55,yMax:120,xMin:40,xMax:250},
-         {yMin:55,yMax:250,xMin:100,xMax:200},
+         {yMin:30,yMax:280,xMin:30,xMax:200} ],
+  'ユ':[ {yMin:55,yMax:250,xMin:40,xMax:250},
          {yMin:210,yMax:270,xMin:30,xMax:270} ],
   'ヨ':[ {yMin:55,yMax:120,xMin:40,xMax:260},
          {yMin:110,yMax:185,xMin:40,xMax:260},
