@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@700&family=Noto+Sans+JP:wght@700&display=swap" rel="stylesheet">
+<title>たのしい！カタカナ</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Hiragino Maru Gothic ProN','Hiragino Sans',YuGothic,'Yu Gothic',Meiryo,sans-serif;background:#fff9f0;min-height:100vh;}
+#hdr{background:linear-gradient(90deg,#ff6b35,#ffd180);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;box-shadow:0 2px 8px rgba(255,107,53,.3);}
+#hdr-title{font-size:18px;font-weight:900;color:#fff;}
+#hdr-badge{font-size:12px;font-weight:900;background:rgba(255,255,255,.35);color:#fff;border-radius:999px;padding:3px 10px;border:2px solid rgba(255,255,255,.5);}
+.page{display:none;max-width:480px;margin:0 auto;padding:16px 12px 40px;}
+.page.show{display:block;}
+.ptitle{font-size:20px;font-weight:900;color:#ff6b35;text-align:center;margin-bottom:16px;}
+#lv-cards{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;}
+.lvc{display:flex;flex-direction:column;align-items:center;gap:6px;width:130px;padding:18px 10px;background:#fff;border:3px solid #ffd6c0;border-radius:20px;cursor:pointer;box-shadow:0 6px 0 rgba(0,0,0,.15);}
+.lvc:active{transform:translateY(4px);}
+.lvc-ico{font-size:36px;}.lvc-name{font-size:15px;font-weight:900;color:#ff6b35;}
+.lvc-desc{font-size:11px;color:#888;text-align:center;line-height:1.6;}
+#char-grid{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;}
+.cbtn{width:54px;height:54px;font-size:28px;font-weight:900;background:#fff;border:3px solid #ffd6c0;border-radius:10px;cursor:pointer;color:#ff6b35;display:flex;align-items:center;justify-content:center;box-shadow:0 5px 0 rgba(0,0,0,.14);position:relative;}
+.cbtn:active{transform:translateY(3px);}.cbtn.done{border-color:#51cf66;background:#f0fff4;}
+.cbtn .sm{position:absolute;top:-6px;right:-6px;font-size:12px;}
+#top-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+#cl-wrap{display:flex;flex-direction:column;align-items:center;gap:4px;}
+#cl-btn{font-size:52px;font-weight:900;color:#ff6b35;background:#fff;border:4px solid #ff6b35;border-radius:14px;padding:2px 12px;cursor:pointer;line-height:1.2;box-shadow:0 6px 0 rgba(0,0,0,.15);}
+#cl-btn:active{transform:translateY(4px);}
+#cl-hint{font-size:11px;color:#bbb;font-weight:700;}
+#si-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;}
+#si-label{font-size:11px;font-weight:700;color:#aaa;}
+#si-boxes{display:flex;gap:5px;flex-wrap:wrap;justify-content:center;}
+.sbox{width:40px;height:40px;border:3px solid #ddd;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;background:#f8f9fa;color:#bbb;}
+.sbox.cur{border-color:#ff6b35;background:#fff5f0;color:#ff6b35;}
+.sbox.don{border-color:#51cf66;background:#ebfbee;color:#51cf66;}
+/* キャンバスエリア：2枚を重ねる */
+#canvas-area{position:relative;width:300px;height:300px;margin:0 auto 12px;border:4px dashed #ffd6c0;border-radius:20px;background:#fff;box-shadow:0 4px 16px rgba(0,0,0,.08);overflow:hidden;touch-action:none;}
+#guide-canvas,#draw-canvas{position:absolute;top:0;left:0;width:300px;height:300px;}
+#draw-canvas{touch-action:none;}
+#btn-row{display:flex;gap:6px;justify-content:center;margin-bottom:10px;}
+.bbtn{font-size:14px;font-weight:900;border:none;border-radius:999px;padding:11px 14px;cursor:pointer;box-shadow:0 5px 0 rgba(0,0,0,.15);flex:1;max-width:140px;}
+.bbtn:active{transform:translateY(4px);}
+.bp{background:#ff6b35;color:#fff;}.bs{background:#4ecdc4;color:#fff;}
+.bo{background:#fff;color:#555;border:3px solid #ddd;box-shadow:0 4px 0 rgba(0,0,0,.12);}
+.bg{background:#51cf66;color:#fff;}
+#prog-row{display:flex;align-items:center;gap:6px;}
+#prog-lbl{font-size:12px;font-weight:700;color:#888;white-space:nowrap;}
+#prog-bg{flex:1;height:14px;background:#eee;border-radius:7px;overflow:hidden;}
+#prog-fill{height:100%;width:0%;background:linear-gradient(90deg,#ff6b35,#ffd180);border-radius:7px;transition:width .3s;}
+#prog-pct{font-size:12px;font-weight:900;color:#ff6b35;min-width:2.4em;text-align:right;}
+#err-toast{display:none;position:fixed;top:66px;left:50%;transform:translateX(-50%);background:#fff3cd;border:2px solid #ffc107;border-radius:14px;padding:10px 18px;font-size:14px;font-weight:900;color:#856404;z-index:200;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.15);}
+#suc-ov{display:none;position:fixed;inset:0;background:rgba(255,250,240,.93);flex-direction:column;align-items:center;justify-content:center;z-index:300;}
+#stars{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:301;}
+#suc-box{display:flex;flex-direction:column;align-items:center;gap:10px;z-index:302;}
+#suc-ch{font-size:100px;font-weight:900;background:linear-gradient(135deg,#ff6b35,#ffd180,#51cf66,#4ecdc4,#748ffc);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:boin .5s cubic-bezier(.34,1.56,.64,1) both;}
+@keyframes boin{from{transform:scale(.3);opacity:0}to{transform:scale(1);opacity:1}}
+#suc-msg{font-size:36px;font-weight:900;color:#ff6b35;}
+#suc-sub{font-size:18px;color:#888;font-weight:700;}
+#suc-btns{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;}
+.spart{position:absolute;font-size:26px;animation:sfly var(--d,1.2s) ease-out forwards;opacity:0;}
+@keyframes sfly{0%{transform:translate(0,0) scale(.5) rotate(0deg);opacity:1}80%{opacity:1}100%{transform:translate(var(--tx,0),var(--ty,-200px)) scale(1.2) rotate(var(--r,360deg));opacity:0}}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-6px)}80%{transform:translateX(6px)}}
+#back-btn{display:block;margin:12px auto 0;font-size:14px;font-weight:900;background:#4ecdc4;color:#fff;border:none;border-radius:999px;padding:10px 20px;cursor:pointer;box-shadow:0 5px 0 rgba(0,0,0,.15);}
+</style>
+</head>
+<body>
+<header id="hdr">
+  <span id="hdr-title">🌈 たのしい！カタカナ</span>
+  <span id="hdr-badge">かんたん</span>
+</header>
+
+<!-- 難易度選択 -->
+<div id="pg-level" class="page show">
+  <p class="ptitle">むずかしさを えらんでね！</p>
+  <div id="lv-cards">
+    <div class="lvc" data-lv="easy"><div class="lvc-ico">🌱</div><div class="lvc-name">かんたん</div><div class="lvc-desc">ガイドが太い<br>書き順じゆう</div></div>
+    <div class="lvc" data-lv="normal"><div class="lvc-ico">🌸</div><div class="lvc-name">ふつう</div><div class="lvc-desc">書き順どおりに<br>なぞろう！</div></div>
+    <div class="lvc" data-lv="hard"><div class="lvc-ico">⭐</div><div class="lvc-name">むずかしい</div><div class="lvc-desc">ガイドうすい<br>書き順きびしく</div></div>
+  </div>
+</div>
+
+<!-- 文字選択 -->
+<div id="pg-chars" class="page">
+  <p class="ptitle">もじを えらんでね！</p>
+  <div id="char-grid"></div>
+  <button id="back-btn" onclick="showPage('pg-level')">← むずかしさにもどる</button>
+</div>
+
+<!-- 練習 -->
+<div id="pg-practice" class="page">
+  <div id="top-row">
+    <div id="cl-wrap">
+      <button id="cl-btn">ア</button>
+      <div id="cl-hint">タップして きこう</div>
+    </div>
+    <div id="si-wrap">
+      <div id="si-label">かきじゅん</div>
+      <div id="si-boxes"></div>
+    </div>
+  </div>
+  <!-- ガイドCanvas(下)とユーザー描画Canvas(上) -->
+  <div id="canvas-area">
+    <canvas id="guide-canvas" width="300" height="300"></canvas>
+    <canvas id="draw-canvas"  width="300" height="300"></canvas>
+  </div>
+  <div id="btn-row">
+    <button class="bbtn bo" onclick="gotoChars()">🔤 もじ</button>
+    <button class="bbtn bs" onclick="clearAll()">🔄 やりなおす</button>
+    <button class="bbtn bp" onclick="checkResult()">✅ できたかな？</button>
+  </div>
+  <div id="prog-row">
+    <span id="prog-lbl">なぞれた：</span>
+    <div id="prog-bg"><div id="prog-fill"></div></div>
+    <span id="prog-pct">0%</span>
+  </div>
+</div>
+
+<div id="err-toast">⚠️ <span id="err-txt"></span></div>
+<div id="suc-ov">
+  <div id="stars"></div>
+  <div id="suc-box">
+    <div id="suc-ch">ア</div>
+    <div id="suc-msg">じょうず！</div>
+    <div id="suc-sub">✨ かけたよ！ ✨</div>
+    <div id="suc-btns">
+      <button class="bbtn bs" style="max-width:none" onclick="closeSuc();clearAll()">🔁 もう一ど</button>
+      <button class="bbtn bg" style="max-width:none" id="btn-next">つぎへ ➡</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   ガイドの描き方：SVGパス・Path2D を一切使わない。
+   Canvas の fillText でカタカナを直接描くだけ。
+   これが最もシンプルで確実。文字化けしない。
+   ============================================================ */
+
+const ORDER=['ア','イ','ウ','エ','オ',
+             'カ','キ','ク','ケ','コ',
+             'サ','シ','ス','セ','ソ',
+             'タ','チ','ツ','テ','ト',
+             'ナ','ニ','ヌ','ネ','ノ',
+             'ハ','ヒ','フ','ヘ','ホ',
+             'マ','ミ','ム','メ','モ',
+             'ヤ','ユ','ヨ',
+             'ラ','リ','ル','レ','ロ',
+             'ワ','ヲ','ン'];
+
+/* 難易度設定 */
+const LV={
+  easy:  {label:'かんたん',  alpha:.55, fontSize:220, hr:32, thr:.30, ord:false},
+  normal:{label:'ふつう',    alpha:.45, fontSize:220, hr:26, thr:.38, ord:true},
+  hard:  {label:'むずかしい',alpha:.30, fontSize:220, hr:20, thr:.48, ord:true},
+};
+
+/* 書き順データ（かんたんは1画扱い、ふつう以上で画ごとに判定） */
+/* 各画の「代表点リスト」でヒット判定。フォントが正しく描ければどこをなぞっても拾える */
+/* ここではシンプルに「1文字=1画」として全体判定のみにする（かんたんモード） */
+/* ふつう・むずかしいでは文字を上下左右のゾーンに分けて簡易書き順判定 */
+
+/* 状態 */
+let level='easy', curCh='ア', drawing=false;
+let coverage=0, cleared=new Set(), errTmr=null;
+let hitGrid=[];    /* ヒット判定用グリッド点 */
+let curSt=0;       /* 現在のストローク番号 */
+let stHits=[];     /* ストロークごとのヒット点配列 */
+
+const NUMS=['①','②','③','④','⑤','⑥'];
+
+/* 各文字の書き順データ
+   各画を「通過すべきy範囲とx範囲」で定義
+   {yMin,yMax,xMin,xMax} の矩形ゾーンをなぞればその画クリア
+   画数が1の文字は書き順チェックなし */
+const STROKE_ORDER={
+  'ア':[ {yMin:60,yMax:120,xMin:40,xMax:260},   // ①横棒
+         {yMin:40,yMax:200,xMin:100,xMax:200},   // ②縦棒
+         {yMin:120,yMax:280,xMin:100,xMax:260} ], // ③払い
+  'イ':[ {yMin:40,yMax:260,xMin:60,xMax:140},
+         {yMin:40,yMax:260,xMin:140,xMax:220} ],
+  'ウ':[ {yMin:30,yMax:80,xMin:100,xMax:200},
+         {yMin:70,yMax:120,xMin:40,xMax:260},
+         {yMin:70,yMax:280,xMin:110,xMax:200} ],
+  'エ':[ {yMin:60,yMax:110,xMin:40,xMax:260},
+         {yMin:60,yMax:240,xMin:110,xMax:200},
+         {yMin:210,yMax:260,xMin:30,xMax:270} ],
+  'オ':[ {yMin:60,yMax:110,xMin:40,xMax:260},
+         {yMin:30,yMax:280,xMin:110,xMax:200},
+         {yMin:130,yMax:280,xMin:40,xMax:180} ],
+  'カ':[ {yMin:30,yMax:280,xMin:60,xMax:150},
+         {yMin:100,yMax:280,xMin:60,xMax:260} ],
+  'キ':[ {yMin:55,yMax:110,xMin:40,xMax:260},
+         {yMin:120,yMax:175,xMin:40,xMax:260},
+         {yMin:40,yMax:280,xMin:110,xMax:200} ],
+  'ク':[ {yMin:50,yMax:160,xMin:50,xMax:240},
+         {yMin:50,yMax:280,xMin:80,xMax:200} ],
+  'ケ':[ {yMin:30,yMax:280,xMin:50,xMax:140},
+         {yMin:70,yMax:120,xMin:50,xMax:260},
+         {yMin:70,yMax:280,xMin:140,xMax:260} ],
+  'コ':[ {yMin:55,yMax:110,xMin:40,xMax:260},
+         {yMin:55,yMax:260,xMin:160,xMax:260} ],
+  'サ':[ {yMin:30,yMax:220,xMin:50,xMax:140},
+         {yMin:90,yMax:160,xMin:40,xMax:260},
+         {yMin:40,yMax:280,xMin:130,xMax:230} ],
+  'シ':[ {yMin:70,yMax:140,xMin:40,xMax:160},
+         {yMin:140,yMax:210,xMin:40,xMax:160},
+         {yMin:30,yMax:280,xMin:120,xMax:280} ],
+  'ス':[ {yMin:60,yMax:120,xMin:40,xMax:260},
+         {yMin:60,yMax:280,xMin:40,xMax:260} ],
+  'セ':[ {yMin:30,yMax:200,xMin:100,xMax:220},
+         {yMin:70,yMax:140,xMin:40,xMax:260},
+         {yMin:200,yMax:260,xMin:30,xMax:270} ],
+  'ソ':[ {yMin:50,yMax:150,xMin:50,xMax:180},
+         {yMin:30,yMax:280,xMin:120,xMax:240} ],
+  'タ':[ {yMin:55,yMax:110,xMin:40,xMax:260},   // ①横棒
+         {yMin:30,yMax:220,xMin:130,xMax:250},   // ②右上払い
+         {yMin:100,yMax:280,xMin:40,xMax:220} ], // ③左払い
+  'チ':[ {yMin:55,yMax:110,xMin:40,xMax:260},
+         {yMin:110,yMax:175,xMin:40,xMax:260},
+         {yMin:55,yMax:280,xMin:100,xMax:260} ],
+  'ツ':[ {yMin:70,yMax:150,xMin:30,xMax:140},
+         {yMin:70,yMax:150,xMin:90,xMax:200},
+         {yMin:30,yMax:280,xMin:130,xMax:280} ],
+  'テ':[ {yMin:50,yMax:100,xMin:40,xMax:260},
+         {yMin:50,yMax:220,xMin:110,xMax:200},
+         {yMin:200,yMax:270,xMin:30,xMax:270} ],
+  'ト':[ {yMin:30,yMax:280,xMin:70,xMax:170},
+         {yMin:110,yMax:230,xMin:70,xMax:260} ],
+  'ナ':[ {yMin:80,yMax:160,xMin:40,xMax:260},
+         {yMin:30,yMax:280,xMin:110,xMax:200} ],
+  'ニ':[ {yMin:70,yMax:140,xMin:50,xMax:250},
+         {yMin:150,yMax:230,xMin:30,xMax:270} ],
+  'ヌ':[ {yMin:60,yMax:130,xMin:40,xMax:260},
+         {yMin:30,yMax:280,xMin:40,xMax:270} ],
+  'ネ':[ {yMin:55,yMax:115,xMin:40,xMax:260},
+         {yMin:30,yMax:200,xMin:100,xMax:200},
+         {yMin:130,yMax:280,xMin:40,xMax:270} ],
+  'ノ':[ {yMin:30,yMax:280,xMin:40,xMax:240} ],
+  'ハ':[ {yMin:50,yMax:280,xMin:30,xMax:150},
+         {yMin:30,yMax:280,xMin:110,xMax:260} ],
+  'ヒ':[ {yMin:30,yMax:280,xMin:50,xMax:150},
+         {yMin:60,yMax:270,xMin:50,xMax:270} ],
+  'フ':[ {yMin:50,yMax:110,xMin:40,xMax:270},
+         {yMin:50,yMax:290,xMin:140,xMax:270} ],
+  'ヘ':[ {yMin:30,yMax:230,xMin:30,xMax:270} ],
+  'ホ':[ {yMin:30,yMax:280,xMin:100,xMax:200},
+         {yMin:110,yMax:185,xMin:30,xMax:270},
+         {yMin:155,yMax:280,xMin:30,xMax:150},
+         {yMin:155,yMax:280,xMin:130,xMax:270} ],
+  'マ':[ {yMin:55,yMax:120,xMin:40,xMax:260},
+         {yMin:30,yMax:280,xMin:100,xMax:270} ],
+  'ミ':[ {yMin:55,yMax:125,xMin:60,xMax:250},
+         {yMin:115,yMax:195,xMin:40,xMax:240},
+         {yMin:175,yMax:260,xMin:30,xMax:260} ],
+  'ム':[ {yMin:30,yMax:280,xMin:30,xMax:200},
+         {yMin:30,yMax:280,xMin:100,xMax:270} ],
+  'メ':[ {yMin:40,yMax:120,xMin:100,xMax:270},
+         {yMin:30,yMax:280,xMin:30,xMax:250} ],
+  'モ':[ {yMin:55,yMax:115,xMin:40,xMax:260},
+         {yMin:115,yMax:185,xMin:40,xMax:260},
+         {yMin:50,yMax:260,xMin:80,xMax:200} ],
+  'ヤ':[ {yMin:55,yMax:120,xMin:100,xMax:270},
+         {yMin:30,yMax:280,xMin:30,xMax:180},
+         {yMin:30,yMax:280,xMin:100,xMax:200} ],
+  'ユ':[ {yMin:55,yMax:120,xMin:40,xMax:250},
+         {yMin:55,yMax:250,xMin:100,xMax:200},
+         {yMin:210,yMax:270,xMin:30,xMax:270} ],
+  'ヨ':[ {yMin:55,yMax:120,xMin:40,xMax:260},
+         {yMin:110,yMax:185,xMin:40,xMax:260},
+         {yMin:55,yMax:260,xMin:140,xMax:260} ],
+  'ラ':[ {yMin:60,yMax:140,xMin:40,xMax:260},
+         {yMin:30,yMax:290,xMin:80,xMax:260} ],
+  'リ':[ {yMin:30,yMax:280,xMin:50,xMax:160},
+         {yMin:30,yMax:280,xMin:120,xMax:230} ],
+  'ル':[ {yMin:30,yMax:280,xMin:40,xMax:180},
+         {yMin:30,yMax:280,xMin:110,xMax:270} ],
+  'レ':[ {yMin:30,yMax:280,xMin:50,xMax:260} ],
+  'ロ':[ {yMin:50,yMax:120,xMin:40,xMax:260},
+         {yMin:50,yMax:260,xMin:40,xMax:150},
+         {yMin:210,yMax:270,xMin:40,xMax:260} ],
+  'ワ':[ {yMin:55,yMax:120,xMin:40,xMax:260},
+         {yMin:55,yMax:290,xMin:130,xMax:260} ],
+  'ヲ':[ {yMin:45,yMax:110,xMin:40,xMax:260},
+         {yMin:90,yMax:175,xMin:40,xMax:260},
+         {yMin:50,yMax:290,xMin:100,xMax:260} ],
+  'ン':[ {yMin:90,yMax:190,xMin:30,xMax:180},
+         {yMin:30,yMax:290,xMin:100,xMax:260} ],
+};
+
+/* Canvas */
+const gCvs=document.getElementById('guide-canvas'); /* ガイド用・固定 */
+const dCvs=document.getElementById('draw-canvas');  /* 描画用 */
+const gCtx=gCvs.getContext('2d');
+const dCtx=dCvs.getContext('2d');
+
+/* 描画Canvasの設定（width/height=300固定・DPR処理なし） */
+dCtx.lineCap='round'; dCtx.lineJoin='round';
+dCtx.lineWidth=18; dCtx.strokeStyle='#ff6b35'; dCtx.fillStyle='#ff6b35';
+
+/* ==============================================================
+   ガイド描画
+   Canvas の fillText でカタカナを描くだけ。
+   フォントは body と同じ日本語フォント。確実に正しい形になる。
+   ============================================================== */
+/* タだけ少し小さく描いて3画目が枠に触れないようにする */
+const CHAR_SCALE={'タ':0.82,'ダ':0.82};
+
+function drawGuide(){
+  const lv=LV[level];
+  gCtx.clearRect(0,0,300,300);
+
+  /* Noto Serif JP（教科書体に近い）でガイド文字を描く
+     clip()で枠外にはみ出さないよう保護 */
+  gCtx.save();
+  gCtx.beginPath();
+  gCtx.rect(0,0,300,300);
+  gCtx.clip();
+
+  const sc = CHAR_SCALE[curCh] || 1.0;
+  const fs = Math.round(lv.fontSize * sc);
+  const font = 'bold '+fs+'px "BIZ UDPGothic","Noto Sans JP",sans-serif';
+
+  gCtx.globalAlpha=lv.alpha;
+  gCtx.fillStyle='#505050';
+  gCtx.font=font;
+  gCtx.textAlign='center';
+  gCtx.textBaseline='middle';
+  gCtx.fillText(curCh,150,155);
+
+  gCtx.globalAlpha=lv.alpha*0.5;
+  gCtx.strokeStyle='#303030';
+  gCtx.lineWidth=1.5;
+  gCtx.strokeText(curCh,150,155);
+
+  gCtx.restore();
+}
+
+/* ==============================================================
+   ヒット判定用グリッド生成
+   ガイドCanvasのピクセルを読み取り、不透明な画素を判定点にする。
+   ============================================================== */
+function buildHitGrid(){
+  /* 一時Canvasにガイド文字を不透明で描いてピクセルを読む */
+  const tmp=document.createElement('canvas');
+  tmp.width=300; tmp.height=300;
+  const tc=tmp.getContext('2d');
+  tc.fillStyle='black';
+  const scH = CHAR_SCALE[curCh] || 1.0;
+  const fsH = Math.round(LV[level].fontSize * scH);
+  tc.font = 'bold '+fsH+'px "BIZ UDPGothic","Noto Sans JP",sans-serif';
+  tc.textAlign='center';
+  tc.textBaseline='middle';
+  tc.fillText(curCh,150,155);
+
+  const img=tc.getImageData(0,0,300,300);
+  const pts=[];
+  const step=6; /* 6pxごとにサンプリング */
+  for(let y=0;y<300;y+=step){
+    for(let x=0;x<300;x+=step){
+      const i=(y*300+x)*4;
+      if(img.data[i+3]>80){ /* アルファ値が80以上なら文字の画素 */
+        pts.push({x,y,hit:false});
+      }
+    }
+  }
+  hitGrid=pts;
+}
+
+/* ページ切り替え */
+function showPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('show'));
+  document.getElementById(id).classList.add('show');
+  window.scrollTo(0,0);
+}
+function gotoChars(){buildGrid();showPage('pg-chars');}
+
+/* 難易度選択 */
+document.querySelectorAll('.lvc').forEach(c=>{
+  c.addEventListener('click',()=>{
+    level=c.dataset.lv;
+    document.getElementById('hdr-badge').textContent=LV[level].label;
+    buildGrid(); showPage('pg-chars');
+  });
+});
+
+/* 文字グリッド */
+function buildGrid(){
+  const g=document.getElementById('char-grid');
+  g.innerHTML='';
+  ORDER.forEach(ch=>{
+    const b=document.createElement('button');
+    b.className='cbtn';
+    if(cleared.has(ch)){
+      b.classList.add('done');
+      const s=document.createElement('span');s.className='sm';s.textContent='⭐';b.appendChild(s);
+    }
+    b.insertAdjacentText('afterbegin',ch);
+    b.addEventListener('click',()=>{curCh=ch;loadPractice();showPage('pg-practice');});
+    g.appendChild(b);
+  });
+}
+
+/* 練習ロード */
+function loadPractice(){
+  document.getElementById('cl-btn').textContent=curCh;
+  coverage=0; curSt=0;
+  /* 書き順データ取得（なければ1画扱い） */
+  const soDef=STROKE_ORDER[curCh]||[{yMin:0,yMax:300,xMin:0,xMax:300}];
+  stHits=soDef.map(()=>false);  /* 各画のヒット状態 */
+  buildSboxes(soDef.length);
+  updateSboxUI();
+  clearDraw();
+  document.fonts.load('bold '+LV[level].fontSize+'px "BIZ UDPGothic"').then(()=>{
+    drawGuide();
+    buildHitGrid();
+  }).catch(()=>{
+    drawGuide();
+    buildHitGrid();
+  });
+  updateProg();
+  setTimeout(()=>speak(curCh),300);
+}
+
+/* 書き順マス */
+function buildSboxes(n){
+  const w=document.getElementById('si-boxes');w.innerHTML='';
+  for(let i=0;i<n;i++){
+    const d=document.createElement('div');d.className='sbox';d.id='sb'+i;
+    d.textContent=NUMS[i]||String(i+1); w.appendChild(d);
+  }
+}
+function updateSboxUI(){
+  const soDef=STROKE_ORDER[curCh]||[{}];
+  const lv=LV[level];
+  soDef.forEach((_,i)=>{
+    const b=document.getElementById('sb'+i); if(!b)return;
+    b.classList.remove('cur','don');
+    if(stHits[i])         { b.classList.add('don'); b.textContent='✓'; }
+    else if(i===curSt&&lv.ord) { b.classList.add('cur'); b.textContent=NUMS[i]||String(i+1); }
+    else                  { b.textContent=NUMS[i]||String(i+1); }
+  });
+}
+
+/* 座標取得：CSSサイズに関係なく常に0-300に変換 */
+function getPos(e){
+  const r=dCvs.getBoundingClientRect();
+  const sx=300/r.width, sy=300/r.height;
+  const s=e.touches?e.touches[0]:e;
+  return{x:(s.clientX-r.left)*sx, y:(s.clientY-r.top)*sy};
+}
+
+/* 描画イベント */
+dCvs.addEventListener('mousedown',onStart,{passive:false});
+dCvs.addEventListener('mousemove',onMove,{passive:false});
+dCvs.addEventListener('mouseup',onEnd);
+dCvs.addEventListener('mouseleave',onEnd);
+dCvs.addEventListener('touchstart',onStart,{passive:false});
+dCvs.addEventListener('touchmove',onMove,{passive:false});
+dCvs.addEventListener('touchend',onEnd);
+
+function onStart(e){
+  e.preventDefault();drawing=true;
+  const{x,y}=getPos(e);
+  dCtx.beginPath();dCtx.arc(x,y,9,0,Math.PI*2);dCtx.fill();
+  dCtx.beginPath();dCtx.moveTo(x,y);
+  doHit(x,y);updateProg();
+}
+function onMove(e){
+  if(!drawing)return;e.preventDefault();
+  const{x,y}=getPos(e);
+  dCtx.lineTo(x,y);dCtx.stroke();dCtx.beginPath();dCtx.moveTo(x,y);
+  doHit(x,y);updateProg();
+}
+function onEnd(){
+  if(!drawing)return;drawing=false;dCtx.beginPath();
+  /* ふつう・むずかしい：1画終わったら次の画へ進む */
+  const lv=LV[level];
+  if(lv.ord){
+    const soDef=STROKE_ORDER[curCh]||[{}];
+    if(curSt<soDef.length&&stHits[curSt]){
+      curSt++;
+      updateSboxUI();
+      playSE('tick');
+      if(curSt>=soDef.length) setTimeout(showSuccess,400);
+    }
+  }
+}
+
+/* ヒット判定 */
+function doHit(x,y){
+  const r2=LV[level].hr**2;
+  /* 全体カバレッジ用 */
+  hitGrid.forEach(p=>{
+    if(p.hit)return;
+    const dx=p.x-x,dy=p.y-y;
+    if(dx*dx+dy*dy<=r2)p.hit=true;
+  });
+  /* 書き順ゾーン判定（ふつう・むずかしい） */
+  const lv=LV[level];
+  if(lv.ord){
+    const soDef=STROKE_ORDER[curCh]||[];
+    if(curSt<soDef.length){
+      const z=soDef[curSt];
+      if(x>=z.xMin&&x<=z.xMax&&y>=z.yMin&&y<=z.yMax){
+        /* 現在の画のゾーンに触れた */
+        stHits[curSt]=true;
+        /* 少し後にストローク進行チェック */
+      }
+    }
+  }
+}
+
+/* 進捗バー */
+function updateProg(){
+  if(!hitGrid.length){coverage=0;}
+  else{coverage=hitGrid.filter(p=>p.hit).length/hitGrid.length;}
+  const pct=Math.round(coverage*100);
+  document.getElementById('prog-fill').style.width=pct+'%';
+  document.getElementById('prog-pct').textContent=pct+'%';
+}
+
+/* クリア */
+function clearDraw(){
+  dCtx.clearRect(0,0,300,300);
+  dCtx.lineCap='round';dCtx.lineJoin='round';
+  dCtx.lineWidth=18;dCtx.strokeStyle='#ff6b35';dCtx.fillStyle='#ff6b35';
+}
+function clearAll(){
+  clearDraw();
+  hitGrid.forEach(p=>p.hit=false);
+  coverage=0; curSt=0;
+  const soDef=STROKE_ORDER[curCh]||[{yMin:0,yMax:300,xMin:0,xMax:300}];
+  stHits=soDef.map(()=>false);
+  updateSboxUI();
+  updateProg();
+  drawGuide();
+  playSE('clear');
+}
+
+/* 判定 */
+function checkResult(){
+  updateProg();
+  const lv=LV[level];
+  const soDef=STROKE_ORDER[curCh]||[{}];
+  if(lv.ord){
+    /* 書き順モード：全画クリアしているか確認 */
+    const allDone=stHits.every(h=>h);
+    if(allDone){
+      showSuccess();
+    }else{
+      const ng=stHits.findIndex(h=>!h);
+      const msg=(NUMS[ng]||String(ng+1))+'のかくをなぞってね！';
+      showErrMsg(msg);
+    }
+  }else{
+    /* かんたんモード：カバレッジで判定 */
+    if(coverage>=lv.thr) showSuccess();
+    else{
+      const pct=Math.round(coverage*100);
+      const msg=pct<20?'もっとゆっくりなぞってみよう！':
+                pct<40?'もうすこし！'+pct+'%かけたよ':
+                       'おしい！'+pct+'%！もう一ど';
+      showErrMsg(msg);
+    }
+  }
+}
+function showErrMsg(msg){
+  document.getElementById('err-txt').textContent=msg;
+  document.getElementById('err-toast').style.display='block';
+  shake();playSE('fail');
+  clearTimeout(errTmr);errTmr=setTimeout(()=>document.getElementById('err-toast').style.display='none',2200);
+}
+
+/* 成功 */
+function showSuccess(){
+  if(document.getElementById('suc-ov').style.display==='flex')return;
+  cleared.add(curCh);
+  document.getElementById('suc-ch').textContent=curCh;
+  document.getElementById('suc-sub').textContent='✨ '+curCh+'がかけたよ！ ✨';
+  const ni=ORDER.indexOf(curCh),nx=ni<ORDER.length-1?ORDER[ni+1]:null;
+  const nb=document.getElementById('btn-next');
+  nb.textContent=nx?nx+'へ ➡':'🏆 ぜんぶ できたよ！';
+  nb.onclick=()=>{closeSuc();if(nx){curCh=nx;loadPractice();}else{buildGrid();showPage('pg-chars');}};
+  document.getElementById('suc-ov').style.display='flex';
+  launchStars(30);playSE('success');speak(curCh+'！じょうず！');
+}
+function closeSuc(){document.getElementById('suc-ov').style.display='none';}
+
+/* 星 */
+function launchStars(n){
+  const sd=document.getElementById('stars');sd.innerHTML='';
+  const em=['⭐','🌟','✨','💫','🌈','🎉'];
+  const cx=window.innerWidth/2,cy=window.innerHeight/2;
+  for(let i=0;i<n;i++){
+    const el=document.createElement('div');el.className='spart';
+    el.textContent=em[i%em.length];
+    const a=Math.random()*Math.PI*2,d2=100+Math.random()*220;
+    el.style.setProperty('--tx',Math.cos(a)*d2+'px');
+    el.style.setProperty('--ty',Math.sin(a)*d2-60+'px');
+    el.style.setProperty('--r',(Math.random()>.5?1:-1)*(180+Math.random()*360)+'deg');
+    el.style.setProperty('--d',(.7+Math.random()*.9)+'s');
+    el.style.left=(cx+(Math.random()-.5)*80)+'px';
+    el.style.top=(cy+(Math.random()-.5)*80)+'px';
+    el.style.animationDelay=(Math.random()*.35)+'s';
+    sd.appendChild(el);
+  }
+  setTimeout(()=>sd.innerHTML='',2800);
+}
+
+/* shake */
+function shake(){
+  const w=document.getElementById('canvas-area');
+  w.style.animation='none';
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{w.style.animation='shake .4s ease';}));
+  w.addEventListener('animationend',()=>w.style.animation='',{once:true});
+}
+
+/* 音声 */
+function speak(t){if(!window.speechSynthesis)return;window.speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang='ja-JP';u.rate=.85;u.pitch=1.2;window.speechSynthesis.speak(u);}
+
+/* 効果音 */
+let AC=null;
+function getAC(){if(!AC)AC=new(window.AudioContext||window.webkitAudioContext)();return AC;}
+function playSE(tp){try{const ac=getAC();
+  if(tp==='success'){tn(ac,523,.00,.15);tn(ac,659,.12,.15);tn(ac,784,.24,.25);tn(ac,1047,.40,.45);}
+  else if(tp==='fail'){tn(ac,300,0,.18);tn(ac,220,.16,.28);}
+  else if(tp==='clear'){tn(ac,800,0,.07);}}catch(e){}}
+function tn(ac,f,dl,dr){const o=ac.createOscillator(),g=ac.createGain();o.connect(g);g.connect(ac.destination);o.type='sine';o.frequency.value=f;const t0=ac.currentTime+dl,t1=t0+dr;g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(.28,t0+.02);g.gain.linearRampToValueAtTime(0,t1);o.start(t0);o.stop(t1+.05);}
+
+document.getElementById('cl-btn').addEventListener('click',()=>{speak(curCh);playSE('clear');});
+</script>
+</body>
+</html>
