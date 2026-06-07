@@ -6,7 +6,8 @@
 <title>たのしい！ひらがな</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@700&family=Noto+Sans+JP:wght@700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@700&family=Klee+One:wght@400;600&family=Noto+Serif+JP:wght@700&family=Noto+Sans+JP:wght@700&display=swap" rel="stylesheet">
+
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'Hiragino Maru Gothic ProN','Hiragino Sans',YuGothic,sans-serif;background:#f0f8ff;min-height:100vh;}
@@ -148,7 +149,7 @@ const STROKE_ORDER={
          {yMin:60,yMax:290,xMin:40,xMax:270} ],   // ②縦＋払い
   'お':[ {yMin:40,yMax:110,xMin:40,xMax:260},    // ①横棒
          {yMin:70,yMax:200,xMin:100,xMax:200},   // ②縦棒
-         {yMin:150,yMax:290,xMin:30,xMax:270} ], // ③払い
+         {yMin:110,yMax:290,xMin:15,xMax:285} ], // ③払い（広め）
   /* ── か行 ── */
   'か':[ {yMin:30,yMax:290,xMin:50,xMax:160},    // ①左縦棒
          {yMin:60,yMax:200,xMin:80,xMax:270},    // ②右横棒（一筆）
@@ -175,10 +176,10 @@ const STROKE_ORDER={
          {yMin:200,yMax:270,xMin:30,xMax:270} ], // ③下横棒
   'そ':[ {yMin:40,yMax:290,xMin:40,xMax:260} ],  // ①一筆
   /* ── た行 ── */
-  'た':[ {yMin:40,yMax:120,xMin:40,xMax:260},    // ①横棒
-         {yMin:40,yMax:200,xMin:110,xMax:210},   // ②縦棒
-         {yMin:150,yMax:290,xMin:30,xMax:160},   // ③左払い
-         {yMin:150,yMax:290,xMin:140,xMax:270} ],// ④右払い
+  'た':[ {yMin:40,yMax:100,xMin:40,xMax:260},
+         {yMin:50,yMax:185,xMin:100,xMax:210},
+         {yMin:115,yMax:175,xMin:130,xMax:275},
+         {yMin:155,yMax:295,xMin:30,xMax:280} ],// ④右払い
   'ち':[ {yMin:40,yMax:160,xMin:50,xMax:260},    // ①上の払い
          {yMin:100,yMax:290,xMin:40,xMax:250} ], // ②丸み
   'つ':[ {yMin:30,yMax:290,xMin:40,xMax:270} ],  // ①一筆
@@ -186,10 +187,10 @@ const STROKE_ORDER={
   'と':[ {yMin:30,yMax:200,xMin:90,xMax:200},    // ①縦棒
          {yMin:130,yMax:290,xMin:50,xMax:250} ], // ②払い
   /* ── な行 ── */
-  'な':[ {yMin:40,yMax:120,xMin:40,xMax:260},    // ①横棒
-         {yMin:50,yMax:190,xMin:100,xMax:200},   // ②縦棒（③と離す）
-         {yMin:195,yMax:290,xMin:30,xMax:160},   // ③左払い（離す）
-         {yMin:195,yMax:290,xMin:140,xMax:270} ],// ④右丸み（離す）
+  'な':[ {yMin:40,yMax:120,xMin:40,xMax:260},
+         {yMin:50,yMax:185,xMin:100,xMax:200},
+         {yMin:85,yMax:165,xMin:150,xMax:275},
+         {yMin:155,yMax:295,xMin:15,xMax:285} ],// ④右丸み（右半分のみ）
   'に':[ {yMin:30,yMax:290,xMin:50,xMax:160},    // ①左縦棒
          {yMin:80,yMax:160,xMin:50,xMax:260},    // ②横棒
          {yMin:160,yMax:270,xMin:50,xMax:270} ], // ③下横棒
@@ -203,10 +204,10 @@ const STROKE_ORDER={
          {yMin:70,yMax:200,xMin:80,xMax:200},    // ②中の縦棒
          {yMin:150,yMax:290,xMin:120,xMax:270} ],// ③右払い
   'ひ':[ {yMin:30,yMax:290,xMin:40,xMax:270} ],  // ①一筆
-  'ふ':[ {yMin:30,yMax:95,xMin:80,xMax:220},     // ①点（上）
-         {yMin:100,yMax:175,xMin:30,xMax:150},   // ②左上払い（離す）
-         {yMin:100,yMax:175,xMin:150,xMax:270},  // ③右上払い（離す）
-         {yMin:180,yMax:290,xMin:30,xMax:270} ], // ④下払い（離す）
+  'ふ':[ {yMin:50,yMax:110,xMin:100,xMax:195},
+         {yMin:110,yMax:160,xMin:120,xMax:220},
+         {yMin:143,yMax:220,xMin:35,xMax:160},
+         {yMin:143,yMax:255,xMin:140,xMax:270} ],// ④右上払い
   'へ':[ {yMin:30,yMax:240,xMin:30,xMax:270} ],  // ①一筆
   'ほ':[ {yMin:30,yMax:290,xMin:50,xMax:160},    // ①左縦棒
          {yMin:80,yMax:160,xMin:50,xMax:270},    // ②横棒
@@ -284,7 +285,10 @@ dCtx.lineWidth=18; dCtx.strokeStyle='#4a90d9'; dCtx.fillStyle='#4a90d9';
 
 /* ガイド描画（Noto Serif JP 教科書体） */
 /* Noto Sans JP を使う文字（画がつながって見える問題を避けるため） */
-const SANS_CHARS=new Set(['き','さ','ふ','な','や','ゆ','ら','む','も']);
+const SANS_CHARS=new Set(['き','さ','な','や','ゆ','ら','む','も','お','れ','わ']);
+const KLEE_CHARS=new Set(['ふ','ね']); /* Klee One（画が自然に離れる） */
+/* りはRI-GOTHIC（BIZ UDPGothicのwoff2）を使う */
+const RI_CHARS=new Set(['り']);
 
 function drawGuide(){
   const lv=LV[level];
@@ -293,7 +297,11 @@ function drawGuide(){
   gCtx.beginPath(); gCtx.rect(0,0,300,300); gCtx.clip();
 
   /* 文字によってフォントを切り替える */
-  const fontFamily=SANS_CHARS.has(curCh)
+  const fontFamily=RI_CHARS.has(curCh)
+    ? '"BIZ UDPGothic",sans-serif'
+    : KLEE_CHARS.has(curCh)
+    ? '"Klee One",cursive'
+    : SANS_CHARS.has(curCh)
     ? '"Noto Sans JP",sans-serif'
     : '"Noto Serif JP",serif';
   const font='bold '+lv.fontSize+'px '+fontFamily;
@@ -319,7 +327,11 @@ function buildHitGrid(){
   tmp.width=300; tmp.height=300;
   const tc=tmp.getContext('2d');
   tc.fillStyle='black';
-  const hitFamily=SANS_CHARS.has(curCh)
+  const hitFamily=RI_CHARS.has(curCh)
+    ? '"BIZ UDPGothic",sans-serif'
+    : KLEE_CHARS.has(curCh)
+    ? '"Klee One",cursive'
+    : SANS_CHARS.has(curCh)
     ? '"Noto Sans JP",sans-serif'
     : '"Noto Serif JP",serif';
   tc.font='bold '+lv.fontSize+'px '+hitFamily;
@@ -378,7 +390,11 @@ function loadPractice(){
   updateSboxUI();
   clearDraw();
   /* 使用フォントを両方ロード待ち */
-  const fam=SANS_CHARS.has(curCh)
+  const fam=RI_CHARS.has(curCh)
+    ? '"BIZ UDPGothic"'
+    : KLEE_CHARS.has(curCh)
+    ? '"Klee One"'
+    : SANS_CHARS.has(curCh)
     ? '"Noto Sans JP"'
     : '"Noto Serif JP"';
   document.fonts.load('bold '+LV[level].fontSize+'px '+fam).then(()=>{
