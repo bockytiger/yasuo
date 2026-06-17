@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>たのしい！アルファベット</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Klee+One:wght@400;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Klee One','Hiragino Maru Gothic ProN',sans-serif;background:#f5fff5;min-height:100vh;}
+#hdr{background:linear-gradient(90deg,#2ecc71,#27ae60,#a8e063);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;box-shadow:0 2px 8px rgba(46,204,113,.3);}
+#hdr-title{font-size:18px;font-weight:900;color:#fff;}
+#hdr-badge{font-size:12px;font-weight:900;background:rgba(255,255,255,.35);color:#fff;border-radius:999px;padding:3px 10px;border:2px solid rgba(255,255,255,.5);}
+.page{display:none;max-width:480px;margin:0 auto;padding:16px 12px 40px;}
+.page.show{display:block;}
+.ptitle{font-size:20px;font-weight:900;color:#27ae60;text-align:center;margin-bottom:16px;}
+
+/* 難易度 */
+#lv-cards{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;}
+.lvc{display:flex;flex-direction:column;align-items:center;gap:6px;width:130px;padding:18px 10px;background:#fff;border:3px solid #a8e063;border-radius:20px;cursor:pointer;box-shadow:0 6px 0 rgba(0,0,0,.13);}
+.lvc:active{transform:translateY(4px);}
+.lvc-ico{font-size:36px;}.lvc-name{font-size:15px;font-weight:900;color:#27ae60;}
+.lvc-desc{font-size:11px;color:#888;text-align:center;line-height:1.6;}
+
+/* 文字選択 */
+.grid-section{margin-bottom:20px;}
+.grid-title{font-size:15px;font-weight:900;padding:6px 12px;border-radius:999px;display:inline-block;margin-bottom:10px;}
+.grid-title.upper{background:#fff3e0;color:#e67e22;}
+.grid-title.lower{background:#e3f2fd;color:#1565c0;}
+.char-grid{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:4px;}
+
+/* 大文字ボタン */
+.cbtn-u{width:50px;height:50px;font-family:'Klee One',cursive;font-size:26px;font-weight:600;background:#fff;border:3px solid #f39c12;border-radius:10px;cursor:pointer;color:#e67e22;display:flex;align-items:center;justify-content:center;box-shadow:0 5px 0 rgba(0,0,0,.12);position:relative;}
+.cbtn-u:active{transform:translateY(3px);box-shadow:0 2px 0 rgba(0,0,0,.12);}
+.cbtn-u.done{border-color:#51cf66;background:#f0fff4;}
+
+/* 小文字ボタン */
+.cbtn-l{width:50px;height:50px;font-family:'Klee One',cursive;font-size:26px;font-weight:600;background:#fff;border:3px solid #3498db;border-radius:10px;cursor:pointer;color:#1565c0;display:flex;align-items:center;justify-content:center;box-shadow:0 5px 0 rgba(0,0,0,.12);position:relative;}
+.cbtn-l:active{transform:translateY(3px);box-shadow:0 2px 0 rgba(0,0,0,.12);}
+.cbtn-l.done{border-color:#51cf66;background:#f0fff4;}
+.cbtn-u .sm,.cbtn-l .sm{position:absolute;top:-6px;right:-6px;font-size:12px;}
+
+/* 練習画面 */
+#top-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+#cl-wrap{display:flex;flex-direction:column;align-items:center;gap:4px;}
+#cl-btn{font-family:'Klee One',cursive;font-size:64px;font-weight:600;border:4px solid #27ae60;border-radius:14px;padding:2px 16px;cursor:pointer;line-height:1.2;box-shadow:0 6px 0 rgba(0,0,0,.13);background:#fff;}
+#cl-btn:active{transform:translateY(4px);}
+#cl-btn.is-upper{color:#e67e22;border-color:#e67e22;}
+#cl-btn.is-lower{color:#1565c0;border-color:#1565c0;}
+#cl-hint{font-size:11px;color:#bbb;font-weight:700;text-align:center;}
+#cl-kind{font-size:11px;font-weight:900;text-align:center;}
+#cl-kind.is-upper{color:#e67e22;}
+#cl-kind.is-lower{color:#1565c0;}
+
+#si-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;}
+#si-label{font-size:11px;font-weight:700;color:#aaa;}
+#si-boxes{display:flex;gap:5px;flex-wrap:wrap;justify-content:center;}
+.sbox{width:40px;height:40px;border:3px solid #ddd;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;background:#f8f9fa;color:#bbb;}
+.sbox.cur{border-color:#27ae60;background:#f0fff4;color:#27ae60;}
+.sbox.don{border-color:#51cf66;background:#ebfbee;color:#51cf66;}
+
+/* キャンバス */
+#canvas-area{position:relative;width:300px;height:300px;margin:0 auto 12px;border-radius:20px;background:#fff;box-shadow:0 4px 16px rgba(0,0,0,.08);overflow:hidden;touch-action:none;}
+#canvas-area.is-upper{border:4px dashed #f39c12;}
+#canvas-area.is-lower{border:4px dashed #3498db;}
+#guide-canvas,#draw-canvas{position:absolute;top:0;left:0;width:300px;height:300px;}
+#draw-canvas{touch-action:none;}
+
+/* ボタン */
+#btn-row{display:flex;gap:6px;justify-content:center;margin-bottom:10px;}
+.bbtn{font-size:14px;font-weight:900;border:none;border-radius:999px;padding:11px 14px;cursor:pointer;box-shadow:0 5px 0 rgba(0,0,0,.13);flex:1;max-width:140px;}
+.bbtn:active{transform:translateY(4px);}
+.bp{background:#27ae60;color:#fff;}.bs{background:#4ecdc4;color:#fff;}
+.bo{background:#fff;color:#555;border:3px solid #ddd;box-shadow:0 4px 0 rgba(0,0,0,.10);}
+.bg{background:#51cf66;color:#fff;}
+
+/* 進捗 */
+#prog-row{display:flex;align-items:center;gap:6px;}
+#prog-lbl{font-size:12px;font-weight:700;color:#888;white-space:nowrap;}
+#prog-bg{flex:1;height:14px;background:#eee;border-radius:7px;overflow:hidden;}
+#prog-fill{height:100%;width:0%;background:linear-gradient(90deg,#2ecc71,#a8e063);border-radius:7px;transition:width .3s;}
+#prog-pct{font-size:12px;font-weight:900;color:#27ae60;min-width:2.4em;text-align:right;}
+
+#err-toast{display:none;position:fixed;top:66px;left:50%;transform:translateX(-50%);background:#fff3cd;border:2px solid #ffc107;border-radius:14px;padding:10px 18px;font-size:14px;font-weight:900;color:#856404;z-index:200;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.13);}
+
+/* 成功 */
+#suc-ov{display:none;position:fixed;inset:0;background:rgba(245,255,245,.93);flex-direction:column;align-items:center;justify-content:center;z-index:300;}
+#stars{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:301;}
+#suc-box{display:flex;flex-direction:column;align-items:center;gap:10px;z-index:302;}
+#suc-ch{font-family:'Klee One',cursive;font-size:120px;font-weight:600;animation:boin .5s cubic-bezier(.34,1.56,.64,1) both;}
+#suc-ch.is-upper{color:#e67e22;}
+#suc-ch.is-lower{color:#1565c0;}
+#suc-msg{font-size:32px;font-weight:900;color:#27ae60;}
+#suc-sub{font-size:16px;color:#888;font-weight:700;}
+#suc-btns{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;}
+@keyframes boin{from{transform:scale(.3);opacity:0}to{transform:scale(1);opacity:1}}
+.spart{position:absolute;font-size:26px;animation:sfly var(--d,1.2s) ease-out forwards;opacity:0;}
+@keyframes sfly{0%{transform:translate(0,0) scale(.5) rotate(0deg);opacity:1}80%{opacity:1}100%{transform:translate(var(--tx,0),var(--ty,-200px)) scale(1.2) rotate(var(--r,360deg));opacity:0}}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-6px)}80%{transform:translateX(6px)}}
+#back-btn{display:block;margin:12px auto 0;font-size:14px;font-weight:900;background:#4ecdc4;color:#fff;border:none;border-radius:999px;padding:10px 20px;cursor:pointer;box-shadow:0 5px 0 rgba(0,0,0,.13);}
+</style>
+</head>
+<body>
+<header id="hdr">
+  <span id="hdr-title">🔤 たのしい！アルファベット</span>
+  <span id="hdr-badge">かんたん</span>
+</header>
+
+<!-- 難易度選択 -->
+<div id="pg-level" class="page show">
+  <p class="ptitle">むずかしさを えらんでね！</p>
+  <div id="lv-cards">
+    <div class="lvc" data-lv="easy"><div class="lvc-ico">🌱</div><div class="lvc-name">かんたん</div><div class="lvc-desc">ガイドが太い<br>書き順じゆう</div></div>
+    <div class="lvc" data-lv="normal"><div class="lvc-ico">🌸</div><div class="lvc-name">ふつう</div><div class="lvc-desc">書き順どおりに<br>なぞろう！</div></div>
+    <div class="lvc" data-lv="hard"><div class="lvc-ico">⭐</div><div class="lvc-name">むずかしい</div><div class="lvc-desc">ガイドうすい<br>書き順きびしく</div></div>
+  </div>
+</div>
+
+<!-- 文字選択 -->
+<div id="pg-chars" class="page">
+  <p class="ptitle">もじを えらんでね！</p>
+  <!-- 大文字セクション -->
+  <div class="grid-section">
+    <span class="grid-title upper">🔠 大文字 Capital Letters</span>
+    <div class="char-grid" id="grid-upper"></div>
+  </div>
+  <!-- 小文字セクション -->
+  <div class="grid-section">
+    <span class="grid-title lower">🔡 小文字 Small Letters</span>
+    <div class="char-grid" id="grid-lower"></div>
+  </div>
+  <button id="back-btn" onclick="showPage('pg-level')">← むずかしさにもどる</button>
+</div>
+
+<!-- 練習 -->
+<div id="pg-practice" class="page">
+  <div id="top-row">
+    <div id="cl-wrap">
+      <button id="cl-btn" class="is-upper">A</button>
+      <div id="cl-kind" class="is-upper">大文字 Capital</div>
+      <div id="cl-hint">タップして きこう</div>
+    </div>
+    <div id="si-wrap">
+      <div id="si-label">かきじゅん</div>
+      <div id="si-boxes"></div>
+    </div>
+  </div>
+  <div id="canvas-area" class="is-upper">
+    <canvas id="guide-canvas" width="300" height="300"></canvas>
+    <canvas id="draw-canvas"  width="300" height="300"></canvas>
+  </div>
+  <div id="btn-row">
+    <button class="bbtn bo" onclick="gotoChars()">🔤 もじ</button>
+    <button class="bbtn bs" onclick="clearAll()">🔄 やりなおす</button>
+    <button class="bbtn bp" onclick="checkResult()">✅ できたかな？</button>
+  </div>
+  <div id="prog-row">
+    <span id="prog-lbl">なぞれた：</span>
+    <div id="prog-bg"><div id="prog-fill"></div></div>
+    <span id="prog-pct">0%</span>
+  </div>
+</div>
+
+<div id="err-toast">⚠️ <span id="err-txt"></span></div>
+<div id="suc-ov">
+  <div id="stars"></div>
+  <div id="suc-box">
+    <div id="suc-ch" class="is-upper">A</div>
+    <div id="suc-msg">じょうず！</div>
+    <div id="suc-sub">✨ かけたよ！ ✨</div>
+    <div id="suc-btns">
+      <button class="bbtn bs" style="max-width:none" onclick="closeSuc();clearAll()">🔁 もう一ど</button>
+      <button class="bbtn bg" style="max-width:none" id="btn-next">つぎへ ➡</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   アルファベット26文字
+   大文字(Upper)・小文字(Lower)を完全に分離して練習
+   ============================================================ */
+
+/* 書き順データ: {strokes:[{yMin,yMax,xMin,xMax},…]} */
+const SO_UPPER = {
+  /* A: 3画 ①左斜め ②右斜め ③横棒 */
+  'A':{s:[{y0:75,y1:228,x0:65,x1:170},{y0:75,y1:228,x0:130,x1:235},{y0:148,y1:190,x0:80,x1:225}]},
+  /* B: 2画 ①縦棒 ②上下の丸み（つなげて） */
+  'B':{s:[{y0:75,y1:228,x0:85,x1:145},{y0:75,y1:228,x0:110,x1:220}]},
+  /* C: 1画 */
+  'C':{s:[{y0:73,y1:230,x0:75,x1:218}]},
+  /* D: 2画 ①縦棒 ②丸み */
+  'D':{s:[{y0:75,y1:228,x0:80,x1:145},{y0:75,y1:228,x0:110,x1:228}]},
+  /* E: 4画 ①縦棒 ②上横 ③中横 ④下横 */
+  'E':{s:[{y0:75,y1:228,x0:90,x1:150},{y0:75,y1:112,x0:90,x1:215},{y0:135,y1:170,x0:90,x1:210},{y0:190,y1:228,x0:90,x1:215}]},
+  /* F: 3画 ①縦棒 ②上横 ③中横 */
+  'F':{s:[{y0:75,y1:228,x0:90,x1:150},{y0:75,y1:112,x0:90,x1:210},{y0:130,y1:165,x0:90,x1:205}]},
+  /* G: 2画 ①丸み ②右の横棒 */
+  'G':{s:[{y0:73,y1:230,x0:73,x1:222},{y0:140,y1:175,x0:140,x1:222}]},
+  /* H: 3画 ①左縦棒 ②横棒 ③右縦棒 */
+  'H':{s:[{y0:75,y1:228,x0:78,x1:138},{y0:75,y1:228,x0:162,x1:222},{y0:138,y1:175,x0:95,x1:210}]},
+  /* I: 1画（縦棒のみ） */
+  'I':{s:[{y0:75,y1:110,x0:85,x1:215},{y0:105,y1:222,x0:118,x1:182},{y0:192,y1:228,x0:85,x1:215}]},
+  /* J: 1画 */
+  'J':{s:[{y0:75,y1:268,x0:90,x1:178}]},
+  /* K: 2画 ①縦棒 ②右の斜め2本（一筆） */
+  'K':{s:[{y0:75,y1:228,x0:85,x1:145},{y0:75,y1:228,x0:118,x1:240}]},
+  /* L: 2画 ①縦棒 ②下横棒 */
+  'L':{s:[{y0:75,y1:228,x0:95,x1:215}]},
+  /* M: 2画 ①左縦棒+V字 ②右縦棒 */
+  'M':{s:[{y0:75,y1:228,x0:62,x1:185},{y0:75,y1:228,x0:155,x1:238}]},
+  /* N: 2画 ①左縦棒+斜め ②右縦棒 */
+  'N':{s:[{y0:75,y1:228,x0:78,x1:180},{y0:75,y1:228,x0:155,x1:222}]},
+  /* O: 1画 */
+  'O':{s:[{y0:73,y1:230,x0:70,x1:230}]},
+  /* P: 2画 ①縦棒 ②上の丸み */
+  'P':{s:[{y0:75,y1:228,x0:88,x1:148},{y0:75,y1:158,x0:110,x1:222}]},
+  /* Q: 2画 ①丸み ②右下の短い棒 */
+  'Q':{s:[{y0:73,y1:256,x0:70,x1:230},{y0:168,y1:256,x0:138,x1:230}]},
+  /* R: 2画 ①縦棒+上の丸み ②右下払い */
+  'R':{s:[{y0:75,y1:228,x0:85,x1:228},{y0:148,y1:228,x0:118,x1:228}]},
+  /* S: 1画 */
+  'S':{s:[{y0:73,y1:230,x0:85,x1:215}]},
+  /* T: 2画 ①縦棒 ②横棒 */
+  'T':{s:[{y0:75,y1:115,x0:76,x1:224},{y0:105,y1:228,x0:122,x1:178}]},
+  /* U: 1画 */
+  'U':{s:[{y0:75,y1:230,x0:82,x1:218}]},
+  /* V: 1画 */
+  'V':{s:[{y0:75,y1:228,x0:68,x1:232}]},
+  /* W: 1画 */
+  'W':{s:[{y0:75,y1:228,x0:40,x1:260}]},
+  /* X: 2画 ①左上から右下 ②右上から左下 */
+  'X':{s:[{y0:75,y1:228,x0:70,x1:175},{y0:75,y1:228,x0:128,x1:230}]},
+  /* Y: 2画 ①左上から中央 ②右上から下 */
+  'Y':{s:[{y0:75,y1:162,x0:68,x1:172},{y0:75,y1:228,x0:128,x1:232}]},
+  /* Z: 3画 ①上横棒 ②斜め ③下横棒 */
+  'Z':{s:[{y0:75,y1:228,x0:78,x1:220}]},
+};
+
+const SO_LOWER = {
+  /* a: 1画（一筆書き） */
+  'a':{s:[{y0:108,y1:230,x0:85,x1:210}]},
+  /* b: 1画（縦棒から丸みへ一筆） */
+  'b':{s:[{y0:68,y1:230,x0:88,x1:218}]},
+  /* c: 1画 */
+  'c':{s:[{y0:108,y1:230,x0:92,x1:202}]},
+  /* d: 1画（丸みから縦棒へ一筆） */
+  'd':{s:[{y0:68,y1:230,x0:82,x1:212}]},
+  /* e: 1画 */
+  'e':{s:[{y0:108,y1:230,x0:84,x1:215}]},
+  /* f: 2画 ①縦棒+曲がり ②横棒 */
+  'f':{s:[{y0:68,y1:228,x0:104,x1:200},{y0:100,y1:148,x0:68,x1:200}]},
+  /* g: 1画（一筆書き） */
+  'g':{s:[{y0:108,y1:270,x0:82,x1:210}]},
+  /* h: 1画（縦棒から右へ一筆） */
+  'h':{s:[{y0:68,y1:228,x0:88,x1:212}]},
+  /* i: 2画 ①縦棒 ②点 */
+  'i':{s:[{y0:110,y1:228,x0:115,x1:185},{y0:65,y1:108,x0:110,x1:185}]},
+  /* j: 2画 ①縦棒+曲がり ②点 */
+  'j':{s:[{y0:110,y1:270,x0:95,x1:180},{y0:65,y1:108,x0:95,x1:180}]},
+  /* k: 3画 ①縦棒 ②右上払い ③右下払い */
+  'k':{s:[{y0:68,y1:228,x0:92,x1:148},{y0:108,y1:228,x0:108,x1:226}]},
+  /* l: 1画 */
+  'l':{s:[{y0:68,y1:228,x0:125,x1:175}]},
+  /* m: 1画（一筆書き） */
+  'm':{s:[{y0:108,y1:228,x0:55,x1:245}]},
+  /* n: 1画（一筆書き） */
+  'n':{s:[{y0:108,y1:228,x0:88,x1:212}]},
+  /* o: 1画 */
+  'o':{s:[{y0:108,y1:230,x0:82,x1:218}]},
+  /* p: 2画 ①縦棒 ②丸み */
+  'p':{s:[{y0:108,y1:270,x0:88,x1:148},{y0:108,y1:180,x0:108,x1:218}]},
+  /* q: 1画（一筆書き） */
+  'q':{s:[{y0:108,y1:270,x0:82,x1:210}]},
+  /* r: 1画（縦棒から右へ一筆） */
+  'r':{s:[{y0:108,y1:228,x0:110,x1:205}]},
+  /* s: 1画 */
+  's':{s:[{y0:108,y1:230,x0:92,x1:206}]},
+  /* t: 2画 ①縦棒 ②横棒 */
+  't':{s:[{y0:80,y1:228,x0:97,x1:200},{y0:110,y1:158,x0:58,x1:200}]},
+  /* u: 1画（一筆書き） */
+  'u':{s:[{y0:110,y1:230,x0:88,x1:210}]},
+  /* v: 1画 */
+  'v':{s:[{y0:110,y1:228,x0:82,x1:218}]},
+  /* w: 1画 */
+  'w':{s:[{y0:110,y1:228,x0:58,x1:242}]},
+  /* x: 2画 */
+  'x':{s:[{y0:110,y1:228,x0:82,x1:172},{y0:110,y1:228,x0:128,x1:218}]},
+  /* y: 2画 ①左上から中央 ②右上から下 */
+  'y':{s:[{y0:110,y1:192,x0:80,x1:175},{y0:110,y1:270,x0:130,x1:218}]},
+  /* z: 3画 ①上横棒 ②斜め ③下横棒 */
+  'z':{s:[{y0:110,y1:228,x0:95,x1:205}]},
+};
+
+const LETTERS = ['A','B','C','D','E','F','G','H','I','J','K','L','M',
+                 'N','O','P','Q','R','S','T','U','V','W','X','Y','Z'];
+
+const LV = {
+  easy:  {label:'かんたん',  alpha:.50, fsize:200, hr:28, thr:.30, ord:false},
+  normal:{label:'ふつう',    alpha:.42, fsize:200, hr:22, thr:.38, ord:true},
+  hard:  {label:'むずかしい',alpha:.28, fsize:200, hr:16, thr:.48, ord:true},
+};
+const NUMS = ['①','②','③','④','⑤'];
+const FONT = '"Klee One",cursive';
+
+/* 状態 */
+let level='easy', curCh='A', isUpper=true, drawing=false;
+let hitGrid=[], coverage=0, stHits=[], curSt=0;
+let clearedU=new Set(), clearedL=new Set(), errTmr=null;
+
+/* Canvas */
+const gCvs=document.getElementById('guide-canvas');
+const dCvs=document.getElementById('draw-canvas');
+const gCtx=gCvs.getContext('2d');
+const dCtx=dCvs.getContext('2d');
+
+function resetDrawCtx(){
+  dCtx.lineCap='round'; dCtx.lineJoin='round'; dCtx.lineWidth=18;
+  dCtx.strokeStyle=isUpper?'#e67e22':'#1565c0';
+  dCtx.fillStyle  =isUpper?'#e67e22':'#1565c0';
+}
+resetDrawCtx();
+
+/* ガイド描画（Canvas全体に1文字を大きく） */
+function drawGuide(){
+  const lv=LV[level];
+  gCtx.clearRect(0,0,300,300);
+  gCtx.save();
+  gCtx.beginPath(); gCtx.rect(0,0,300,300); gCtx.clip();
+
+  const col = isUpper ? '#e67e22' : '#1565c0';
+  const outCol = isUpper ? '#c0560a' : '#0d3a7a';
+
+  /* IだけNoto Serif JP（上下横棒が見える教科書体） */
+  const useFont = (isUpper && curCh==='I') ? '"Noto Serif JP",serif' : FONT;
+
+  gCtx.globalAlpha = lv.alpha;
+  gCtx.fillStyle   = col;
+  gCtx.font        = '600 '+lv.fsize+'px '+useFont;
+  gCtx.textAlign   = 'center';
+  gCtx.textBaseline= 'middle';
+  gCtx.fillText(curCh, 150, 155);
+
+  gCtx.globalAlpha = lv.alpha * 0.5;
+  gCtx.strokeStyle = outCol;
+  gCtx.lineWidth   = 1.5;
+  gCtx.font        = '600 '+lv.fsize+'px '+useFont;
+  gCtx.strokeText(curCh, 150, 155);
+  gCtx.restore();
+}
+
+/* ヒットグリッド生成 */
+function buildHitGrid(){
+  const lv=LV[level];
+  const tmp=document.createElement('canvas');
+  tmp.width=300; tmp.height=300;
+  const tc=tmp.getContext('2d');
+  const hitFont = (isUpper && curCh==='I') ? '"Noto Serif JP",serif' : FONT;
+  tc.font='600 '+lv.fsize+'px '+hitFont;
+  tc.textAlign='center'; tc.textBaseline='middle';
+  tc.fillStyle='black';
+  tc.fillText(curCh, 150, 155);
+  const img=tc.getImageData(0,0,300,300);
+  const pts=[];
+  for(let y=0;y<300;y+=5)
+    for(let x=0;x<300;x+=5)
+      if(img.data[(y*300+x)*4+3]>60) pts.push({x,y,hit:false});
+  hitGrid=pts;
+}
+
+/* ページ切り替え */
+function showPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('show'));
+  document.getElementById(id).classList.add('show');
+  window.scrollTo(0,0);
+}
+function gotoChars(){ buildGrid(); showPage('pg-chars'); }
+
+/* 難易度選択 */
+document.querySelectorAll('.lvc').forEach(c=>{
+  c.addEventListener('click',()=>{
+    level=c.dataset.lv;
+    document.getElementById('hdr-badge').textContent=LV[level].label;
+    buildGrid(); showPage('pg-chars');
+  });
+});
+
+/* 文字グリッド構築（大文字・小文字を分けて表示） */
+function buildGrid(){
+  buildGridSection('grid-upper', LETTERS, true);
+  buildGridSection('grid-lower', LETTERS.map(c=>c.toLowerCase()), false);
+}
+
+function buildGridSection(gridId, chars, upper){
+  const g=document.getElementById(gridId);
+  g.innerHTML='';
+  chars.forEach(ch=>{
+    const b=document.createElement('button');
+    b.className = upper ? 'cbtn-u' : 'cbtn-l';
+    const cleared = upper ? clearedU : clearedL;
+    const key = upper ? ch : ch.toUpperCase();
+    if(cleared.has(key)){
+      b.classList.add('done');
+      const s=document.createElement('span'); s.className='sm'; s.textContent='⭐'; b.appendChild(s);
+    }
+    b.insertAdjacentText('afterbegin', ch);
+    b.addEventListener('click',()=>{
+      curCh   = upper ? ch : ch.toUpperCase();
+      isUpper = upper;
+      /* 小文字の場合は表示文字を小文字に */
+      if(!upper) curCh = ch; /* ch はすでに小文字 */
+      else       curCh = ch; /* ch はすでに大文字 */
+      loadPractice();
+      showPage('pg-practice');
+    });
+    g.appendChild(b);
+  });
+}
+
+/* 練習ロード */
+function loadPractice(){
+  /* UI更新 */
+  const clBtn  = document.getElementById('cl-btn');
+  const clKind = document.getElementById('cl-kind');
+  const area   = document.getElementById('canvas-area');
+  clBtn.textContent = curCh;
+  clBtn.className   = isUpper ? 'is-upper' : 'is-lower';
+  clKind.textContent= isUpper ? '大文字 Capital' : '小文字 Small';
+  clKind.className  = isUpper ? 'is-upper' : 'is-lower';
+  area.className    = isUpper ? 'is-upper' : 'is-lower';
+  resetDrawCtx();
+
+  coverage=0; curSt=0;
+  const so = isUpper ? SO_UPPER[curCh] : SO_LOWER[curCh.toLowerCase()];
+  stHits = so ? so.s.map(()=>false) : [false];
+  buildSboxes(so ? so.s.length : 1);
+  updateSboxUI();
+  clearDraw();
+  document.fonts.load('600 200px "Klee One"').then(()=>{
+    drawGuide(); buildHitGrid();
+  }).catch(()=>{ drawGuide(); buildHitGrid(); });
+  updateProg();
+  setTimeout(()=>speak(curCh), 300);
+}
+
+/* 書き順マス */
+function buildSboxes(n){
+  const w=document.getElementById('si-boxes'); w.innerHTML='';
+  for(let i=0;i<n;i++){
+    const d=document.createElement('div'); d.className='sbox'; d.id='sb'+i;
+    d.textContent=NUMS[i]||String(i+1); w.appendChild(d);
+  }
+}
+function updateSboxUI(){
+  const so=isUpper?SO_UPPER[curCh]:SO_LOWER[curCh.toLowerCase()];
+  const n=so?so.s.length:1, lv=LV[level];
+  for(let i=0;i<n;i++){
+    const b=document.getElementById('sb'+i); if(!b)continue;
+    b.classList.remove('cur','don');
+    if(stHits[i]){b.classList.add('don');b.textContent='✓';}
+    else{b.textContent=NUMS[i]||String(i+1);if(i===curSt&&lv.ord)b.classList.add('cur');}
+  }
+}
+
+/* 座標取得 */
+function getPos(e){
+  const r=dCvs.getBoundingClientRect();
+  const sx=300/r.width, sy=300/r.height;
+  const s=e.touches?e.touches[0]:e;
+  return{x:(s.clientX-r.left)*sx, y:(s.clientY-r.top)*sy};
+}
+
+/* 描画 */
+dCvs.addEventListener('mousedown',onStart,{passive:false});
+dCvs.addEventListener('mousemove',onMove,{passive:false});
+dCvs.addEventListener('mouseup',onEnd);
+dCvs.addEventListener('mouseleave',onEnd);
+dCvs.addEventListener('touchstart',onStart,{passive:false});
+dCvs.addEventListener('touchmove',onMove,{passive:false});
+dCvs.addEventListener('touchend',onEnd);
+
+function onStart(e){
+  e.preventDefault(); drawing=true;
+  if(!checkOrd()){drawing=false;return;}
+  const{x,y}=getPos(e);
+  dCtx.beginPath(); dCtx.arc(x,y,9,0,Math.PI*2); dCtx.fill();
+  dCtx.beginPath(); dCtx.moveTo(x,y);
+  doHit(x,y); updateProg();
+}
+function onMove(e){
+  if(!drawing)return; e.preventDefault();
+  const{x,y}=getPos(e);
+  dCtx.lineTo(x,y); dCtx.stroke(); dCtx.beginPath(); dCtx.moveTo(x,y);
+  doHit(x,y); updateProg();
+}
+function onEnd(){
+  if(!drawing)return; drawing=false; dCtx.beginPath();
+  if(LV[level].ord) autoAdv();
+}
+
+/* 書き順チェック */
+function checkOrd(){
+  const lv=LV[level]; if(!lv.ord)return true;
+  const so=isUpper?SO_UPPER[curCh]:SO_LOWER[curCh.toLowerCase()];
+  if(!so||curSt===0||curSt>=so.s.length)return true;
+  if(!stHits[curSt-1]){showErr(curSt);return false;}
+  return true;
+}
+
+/* ヒット判定 */
+function doHit(x,y){
+  const lv=LV[level], r2=lv.hr**2;
+  hitGrid.forEach(p=>{
+    if(p.hit)return;
+    const dx=p.x-x,dy=p.y-y;
+    if(dx*dx+dy*dy<=r2) p.hit=true;
+  });
+  const so=isUpper?SO_UPPER[curCh]:SO_LOWER[curCh.toLowerCase()];
+  if(!so)return;
+  if(lv.ord){
+    const z=so.s[curSt];
+    if(z&&x>=z.x0&&x<=z.x1&&y>=z.y0&&y<=z.y1) stHits[curSt]=true;
+  } else {
+    so.s.forEach((z,i)=>{ if(x>=z.x0&&x<=z.x1&&y>=z.y0&&y<=z.y1) stHits[i]=true; });
+  }
+}
+
+/* ストローク自動進行 */
+function autoAdv(){
+  const so=isUpper?SO_UPPER[curCh]:SO_LOWER[curCh.toLowerCase()];
+  if(!so||curSt>=so.s.length)return;
+  if(stHits[curSt]){
+    curSt++; playSE('tick'); updateSboxUI();
+    if(curSt>=so.s.length) setTimeout(showSuccess,350);
+  }
+}
+
+/* 進捗 */
+function updateProg(){
+  coverage=hitGrid.length?hitGrid.filter(p=>p.hit).length/hitGrid.length:0;
+  const pct=Math.round(coverage*100);
+  document.getElementById('prog-fill').style.width=pct+'%';
+  document.getElementById('prog-pct').textContent=pct+'%';
+}
+
+/* クリア */
+function clearDraw(){
+  dCtx.clearRect(0,0,300,300); resetDrawCtx();
+}
+function clearAll(){
+  clearDraw(); hitGrid.forEach(p=>p.hit=false);
+  const so=isUpper?SO_UPPER[curCh]:SO_LOWER[curCh.toLowerCase()];
+  stHits=so?so.s.map(()=>false):[false]; curSt=0; coverage=0;
+  updateProg(); updateSboxUI(); drawGuide(); playSE('clear');
+}
+
+/* 判定 */
+function checkResult(){
+  updateProg();
+  const lv=LV[level];
+  const so=isUpper?SO_UPPER[curCh]:SO_LOWER[curCh.toLowerCase()];
+  if(lv.ord&&so){
+    if(stHits.every(h=>h)) showSuccess();
+    else{
+      const ng=stHits.findIndex(h=>!h);
+      showErrMsg((NUMS[ng]||String(ng+1))+' をなぞってね ('+Math.round(coverage*100)+'%)');
+    }
+  } else {
+    if(coverage>=lv.thr) showSuccess();
+    else showErrMsg('もうすこし！ '+Math.round(coverage*100)+'%かけたよ');
+  }
+}
+function showErrMsg(msg){
+  document.getElementById('err-txt').textContent=msg;
+  document.getElementById('err-toast').style.display='block';
+  shake(); playSE('fail');
+  clearTimeout(errTmr);
+  errTmr=setTimeout(()=>document.getElementById('err-toast').style.display='none',2200);
+}
+function showErr(si){ showErrMsg((NUMS[si]||String(si+1))+' を さきに！'); }
+
+/* 次の文字を取得 */
+function getNext(){
+  const key = isUpper ? curCh : curCh.toLowerCase();
+  const list = isUpper ? LETTERS : LETTERS.map(c=>c.toLowerCase());
+  const idx  = list.indexOf(key);
+  if(idx < list.length-1) return {ch: list[idx+1], upper: isUpper};
+  /* 大文字が終わったら小文字へ */
+  if(isUpper) return {ch: LETTERS[0].toLowerCase(), upper: false};
+  return null;
+}
+
+/* 成功 */
+function showSuccess(){
+  if(document.getElementById('suc-ov').style.display==='flex')return;
+  if(isUpper) clearedU.add(curCh);
+  else        clearedL.add(curCh.toUpperCase());
+
+  const sucCh=document.getElementById('suc-ch');
+  sucCh.textContent=curCh;
+  sucCh.className=isUpper?'is-upper':'is-lower';
+  document.getElementById('suc-sub').textContent='✨ '+curCh+' がかけたよ！ ✨';
+
+  const nx=getNext();
+  const nb=document.getElementById('btn-next');
+  if(nx){
+    nb.textContent=nx.ch+' へ ➡';
+    nb.onclick=()=>{closeSuc();curCh=nx.ch;isUpper=nx.upper;loadPractice();};
+  } else {
+    nb.textContent='🏆 ぜんぶ できたよ！';
+    nb.onclick=()=>{closeSuc();buildGrid();showPage('pg-chars');};
+  }
+  document.getElementById('suc-ov').style.display='flex';
+  launchStars(30); playSE('success'); speak(curCh+'! じょうず！');
+}
+function closeSuc(){document.getElementById('suc-ov').style.display='none';}
+
+/* 星 */
+function launchStars(n){
+  const sd=document.getElementById('stars'); sd.innerHTML='';
+  const em=['⭐','🌟','✨','💫','🌿','🎉'];
+  const cx=window.innerWidth/2, cy=window.innerHeight/2;
+  for(let i=0;i<n;i++){
+    const el=document.createElement('div'); el.className='spart';
+    el.textContent=em[i%em.length];
+    const a=Math.random()*Math.PI*2, d2=100+Math.random()*220;
+    el.style.setProperty('--tx',Math.cos(a)*d2+'px');
+    el.style.setProperty('--ty',Math.sin(a)*d2-60+'px');
+    el.style.setProperty('--r',(Math.random()>.5?1:-1)*(180+Math.random()*360)+'deg');
+    el.style.setProperty('--d',(.7+Math.random()*.9)+'s');
+    el.style.left=(cx+(Math.random()-.5)*80)+'px';
+    el.style.top =(cy+(Math.random()-.5)*80)+'px';
+    el.style.animationDelay=(Math.random()*.35)+'s';
+    sd.appendChild(el);
+  }
+  setTimeout(()=>sd.innerHTML='',2800);
+}
+
+/* shake */
+function shake(){
+  const w=document.getElementById('canvas-area');
+  w.style.animation='none';
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{w.style.animation='shake .4s ease';}));
+  w.addEventListener('animationend',()=>w.style.animation='',{once:true});
+}
+
+/* 音声 */
+/* 日本人が発音するアルファベット読み（ア・ビー・スィー…） */
+const JP_ALPHA={
+  'A':'エー','B':'ビー','C':'スィー','D':'ディー','E':'イー',
+  'F':'エフ','G':'ジー','H':'エイチ','I':'アイ','J':'ジェー',
+  'K':'ケー','L':'エル','M':'エム','N':'エヌ','O':'オー',
+  'P':'ピー','Q':'キュー','R':'アール','S':'エス','T':'ティー',
+  'U':'ユー','V':'ブイ','W':'ダブリュー','X':'エックス',
+  'Y':'ワイ','Z':'ゼット'
+};
+function speak(t){
+  if(!window.speechSynthesis)return;
+  window.speechSynthesis.cancel();
+  /* アルファベット1文字ならカタカナ読みに変換 */
+  const key=t.trim().toUpperCase();
+  const text=JP_ALPHA[key]||JP_ALPHA[key.replace('！','')]||t;
+  const u=new SpeechSynthesisUtterance(text);
+  u.lang='ja-JP'; u.rate=.8; u.pitch=1.2;
+  window.speechSynthesis.speak(u);
+}
+
+/* 効果音 */
+let AC=null;
+function getAC(){if(!AC)AC=new(window.AudioContext||window.webkitAudioContext)();return AC;}
+function playSE(tp){try{const ac=getAC();
+  if(tp==='success'){tn(ac,523,.00,.15);tn(ac,659,.12,.15);tn(ac,784,.24,.25);tn(ac,1047,.40,.45);}
+  else if(tp==='tick'){tn(ac,660,0,.10);tn(ac,880,.08,.12);}
+  else if(tp==='fail'){tn(ac,300,0,.18);tn(ac,220,.16,.28);}
+  else if(tp==='clear'){tn(ac,800,0,.07);}}catch(e){}}
+function tn(ac,f,dl,dr){
+  const o=ac.createOscillator(),g=ac.createGain();
+  o.connect(g);g.connect(ac.destination);o.type='sine';o.frequency.value=f;
+  const t0=ac.currentTime+dl,t1=t0+dr;
+  g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(.28,t0+.02);g.gain.linearRampToValueAtTime(0,t1);
+  o.start(t0);o.stop(t1+.05);
+}
+
+document.getElementById('cl-btn').addEventListener('click',()=>{
+  speak(curCh); playSE('clear');
+});
+</script>
+</body>
+</html>

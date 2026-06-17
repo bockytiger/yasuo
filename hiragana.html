@@ -6,11 +6,11 @@
 <title>たのしい！ひらがな</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@700&family=Klee+One:wght@400;600&family=Noto+Serif+JP:wght@700&family=Noto+Sans+JP:wght@700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Klee+One:wght@400;600&display=swap" rel="stylesheet">
 
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'Hiragino Maru Gothic ProN','Hiragino Sans',YuGothic,sans-serif;background:#f0f8ff;min-height:100vh;}
+body{font-family:'Klee One','Hiragino Maru Gothic ProN',sans-serif;background:#f0f8ff;min-height:100vh;}
 #hdr{background:linear-gradient(90deg,#4a90d9,#7ec8e3,#b8e0ff);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;box-shadow:0 2px 8px rgba(74,144,217,.3);}
 #hdr-title{font-size:18px;font-weight:900;color:#fff;}
 #hdr-badge{font-size:12px;font-weight:900;background:rgba(255,255,255,.35);color:#fff;border-radius:999px;padding:3px 10px;border:2px solid rgba(255,255,255,.5);}
@@ -147,9 +147,9 @@ const STROKE_ORDER={
          {yMin:70,yMax:290,xMin:50,xMax:250} ],   // ②丸み
   'え':[ {yMin:40,yMax:110,xMin:60,xMax:240},    // ①横棒
          {yMin:60,yMax:290,xMin:40,xMax:270} ],   // ②縦＋払い
-  'お':[ {yMin:40,yMax:110,xMin:40,xMax:260},    // ①横棒
-         {yMin:70,yMax:200,xMin:100,xMax:200},   // ②縦棒
-         {yMin:110,yMax:290,xMin:15,xMax:285} ], // ③払い（広め）
+  'お':[ {yMin:75,yMax:132,xMin:145,xMax:248},   // ①横棒
+         {yMin:60,yMax:140,xMin:100,xMax:135},   // ②縦棒
+         {yMin:100,yMax:295,xMin:10,xMax:295} ], // ③払い（広め）
   /* ── か行 ── */
   'か':[ {yMin:30,yMax:290,xMin:50,xMax:160},    // ①左縦棒
          {yMin:60,yMax:200,xMin:80,xMax:270},    // ②右横棒（一筆）
@@ -219,13 +219,14 @@ const STROKE_ORDER={
          {yMin:150,yMax:290,xMin:80,xMax:230} ], // ③丸み
   'み':[ {yMin:40,yMax:200,xMin:40,xMax:180},    // ①左払い
          {yMin:40,yMax:290,xMin:110,xMax:270} ], // ②右丸み
-  'む':[ {yMin:40,yMax:130,xMin:40,xMax:200},    // ①横棒
-         {yMin:80,yMax:290,xMin:30,xMax:270} ],  // ②丸み
+  'む':[ {yMin:78,yMax:115,xMin:30,xMax:245},    // ①横棒
+         {yMin:108,yMax:265,xMin:30,xMax:182},   // ②縦棒＋左下払い
+         {yMin:100,yMax:158,xMin:190,xMax:268} ],// ③右上の点（右側）,  // ②丸み
   'め':[ {yMin:40,yMax:290,xMin:30,xMax:160},    // ①左払い
          {yMin:40,yMax:290,xMin:120,xMax:270} ], // ②右丸み
-  'も':[ {yMin:50,yMax:118,xMin:40,xMax:260},    // ①上横棒（離す）
-         {yMin:122,yMax:198,xMin:40,xMax:260},   // ②中横棒（離す）
-         {yMin:202,yMax:290,xMin:80,xMax:230} ], // ③丸み（離す）
+  'も':[ {yMin:50,yMax:125,xMin:55,xMax:215},    // ①縦の曲がり棒
+         {yMin:120,yMax:175,xMin:55,xMax:240},   // ②中横棒（広めに設定）
+         {yMin:160,yMax:260,xMin:55,xMax:245} ], // ③丸み（離す）
   /* ── や行 ── */
   'や':[ {yMin:50,yMax:200,xMin:50,xMax:190},    // ①左払い
          {yMin:40,yMax:115,xMin:120,xMax:270},   // ②右上横（離す）
@@ -283,12 +284,7 @@ const dCtx=dCvs.getContext('2d');
 dCtx.lineCap='round'; dCtx.lineJoin='round';
 dCtx.lineWidth=18; dCtx.strokeStyle='#4a90d9'; dCtx.fillStyle='#4a90d9';
 
-/* ガイド描画（Noto Serif JP 教科書体） */
-/* Noto Sans JP を使う文字（画がつながって見える問題を避けるため） */
-const SANS_CHARS=new Set(['き','さ','な','や','ゆ','ら','む','も','お','れ','わ']);
-const KLEE_CHARS=new Set(['ふ','ね']); /* Klee One（画が自然に離れる） */
-/* りはRI-GOTHIC（BIZ UDPGothicのwoff2）を使う */
-const RI_CHARS=new Set(['り']);
+/* ガイド描画：全文字 Klee One */
 
 function drawGuide(){
   const lv=LV[level];
@@ -297,14 +293,7 @@ function drawGuide(){
   gCtx.beginPath(); gCtx.rect(0,0,300,300); gCtx.clip();
 
   /* 文字によってフォントを切り替える */
-  const fontFamily=RI_CHARS.has(curCh)
-    ? '"BIZ UDPGothic",sans-serif'
-    : KLEE_CHARS.has(curCh)
-    ? '"Klee One",cursive'
-    : SANS_CHARS.has(curCh)
-    ? '"Noto Sans JP",sans-serif'
-    : '"Noto Serif JP",serif';
-  const font='bold '+lv.fontSize+'px '+fontFamily;
+  const font='600 '+lv.fontSize+'px "Klee One",cursive';
 
   gCtx.globalAlpha=lv.alpha;
   gCtx.fillStyle='#404040';
@@ -327,14 +316,7 @@ function buildHitGrid(){
   tmp.width=300; tmp.height=300;
   const tc=tmp.getContext('2d');
   tc.fillStyle='black';
-  const hitFamily=RI_CHARS.has(curCh)
-    ? '"BIZ UDPGothic",sans-serif'
-    : KLEE_CHARS.has(curCh)
-    ? '"Klee One",cursive'
-    : SANS_CHARS.has(curCh)
-    ? '"Noto Sans JP",sans-serif'
-    : '"Noto Serif JP",serif';
-  tc.font='bold '+lv.fontSize+'px '+hitFamily;
+  tc.font='600 '+lv.fontSize+'px "Klee One",cursive';
   tc.textAlign='center'; tc.textBaseline='middle';
   tc.fillText(curCh,150,155);
   const img=tc.getImageData(0,0,300,300);
@@ -385,19 +367,11 @@ function loadPractice(){
   document.getElementById('cl-btn').textContent=curCh;
   coverage=0; curSt=0;
   const soDef=STROKE_ORDER[curCh]||[{yMin:0,yMax:300,xMin:0,xMax:300}];
-  stHits=soDef.map(()=>false);
+  stHits=soDef.map(()=>0); /* 各画のヒット点数 */
   buildSboxes(soDef.length);
   updateSboxUI();
   clearDraw();
-  /* 使用フォントを両方ロード待ち */
-  const fam=RI_CHARS.has(curCh)
-    ? '"BIZ UDPGothic"'
-    : KLEE_CHARS.has(curCh)
-    ? '"Klee One"'
-    : SANS_CHARS.has(curCh)
-    ? '"Noto Sans JP"'
-    : '"Noto Serif JP"';
-  document.fonts.load('bold '+LV[level].fontSize+'px '+fam).then(()=>{
+  document.fonts.load('600 '+LV[level].fontSize+'px "Klee One"').then(()=>{
     drawGuide(); buildHitGrid();
   }).catch(()=>{
     drawGuide(); buildHitGrid();
@@ -483,17 +457,19 @@ function doHit(x,y){
   const soDef=STROKE_ORDER[curCh]||[];
   if(lv.ord){
     const z=soDef[curSt];
-    if(z&&x>=z.xMin&&x<=z.xMax&&y>=z.yMin&&y<=z.yMax) stHits[curSt]=true;
+    if(z&&x>=z.xMin&&x<=z.xMax&&y>=z.yMin&&y<=z.yMax) stHits[curSt]++;
   } else {
-    soDef.forEach((z,i)=>{ if(x>=z.xMin&&x<=z.xMax&&y>=z.yMin&&y<=z.yMax)stHits[i]=true; });
+    soDef.forEach((z,i)=>{ if(x>=z.xMin&&x<=z.xMax&&y>=z.yMin&&y<=z.yMax)stHits[i]++; });
   }
 }
 
 /* ストローク自動進行 */
+/* 1画あたり最低このポイント数なぞれば「完了」とみなす */
+const STROKE_MIN_HIT = 1; /* 1点でもヒットすれば画完了 */
 function autoAdv(){
   const soDef=STROKE_ORDER[curCh]||[];
   if(curSt>=soDef.length)return;
-  if(stHits[curSt]){
+  if(stHits[curSt]>=STROKE_MIN_HIT){
     curSt++; playSE('tick'); updateSboxUI();
     if(curSt>=soDef.length) setTimeout(showSuccess,350);
   }
@@ -517,7 +493,7 @@ function clearDraw(){
 function clearAll(){
   clearDraw(); hitGrid.forEach(p=>p.hit=false);
   const soDef=STROKE_ORDER[curCh]||[];
-  stHits=soDef.map(()=>false); curSt=0; coverage=0;
+  stHits=soDef.map(()=>0); /* 各画のヒット点数 */ curSt=0; coverage=0;
   updateProg(); updateSboxUI(); drawGuide(); playSE('clear');
 }
 
@@ -527,9 +503,9 @@ function checkResult(){
   const lv=LV[level];
   const soDef=STROKE_ORDER[curCh]||[];
   if(lv.ord){
-    if(stHits.every(h=>h)) showSuccess();
+    if(stHits.every(h=>h>=STROKE_MIN_HIT)) showSuccess();
     else{
-      const ng=stHits.findIndex(h=>!h);
+      const ng=stHits.findIndex(h=>h<STROKE_MIN_HIT);
       const pct=Math.round(coverage*100);
       showErrMsg((NUMS[ng]||String(ng+1))+' のかくをなぞってね。('+pct+'%)');
     }
