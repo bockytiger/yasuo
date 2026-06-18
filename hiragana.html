@@ -200,9 +200,9 @@ const STROKE_ORDER={
          {yMin:40,yMax:290,xMin:110,xMax:270} ], // ②右丸み
   'の':[ {yMin:30,yMax:290,xMin:40,xMax:270} ],  // ①一筆
   /* ── は行 ── */
-  'は':[ {yMin:30,yMax:290,xMin:50,xMax:160},    // ①左縦棒
-         {yMin:70,yMax:200,xMin:80,xMax:200},    // ②中の縦棒
-         {yMin:150,yMax:290,xMin:120,xMax:270} ],// ③右払い
+  'は':[ {yMin:30,yMax:290,xMin:40,xMax:150},    // ①左縦棒
+         {yMin:60,yMax:210,xMin:100,xMax:210},   // ②中の縦棒
+         {yMin:100,yMax:290,xMin:180,xMax:275} ],// ③右払い（右側専用）
   'ひ':[ {yMin:30,yMax:290,xMin:40,xMax:270} ],  // ①一筆
   'ふ':[ {yMin:50,yMax:110,xMin:100,xMax:195},
          {yMin:110,yMax:160,xMin:120,xMax:220},
@@ -219,9 +219,9 @@ const STROKE_ORDER={
          {yMin:150,yMax:290,xMin:80,xMax:230} ], // ③丸み
   'み':[ {yMin:40,yMax:200,xMin:40,xMax:180},    // ①左払い
          {yMin:40,yMax:290,xMin:110,xMax:270} ], // ②右丸み
-  'む':[ {yMin:78,yMax:115,xMin:30,xMax:245},    // ①横棒
-         {yMin:108,yMax:265,xMin:30,xMax:182},   // ②縦棒＋左下払い
-         {yMin:100,yMax:158,xMin:190,xMax:268} ],// ③右上の点（右側）,  // ②丸み
+  'む':[ {yMin:55,yMax:135,xMin:25,xMax:200},    // ①横棒
+         {yMin:90,yMax:290,xMin:25,xMax:210},    // ②縦＋丸み
+         {yMin:80,yMax:180,xMin:215,xMax:280} ], // ③右の点（右端専用）
   'め':[ {yMin:40,yMax:290,xMin:30,xMax:160},    // ①左払い
          {yMin:40,yMax:290,xMin:120,xMax:270} ], // ②右丸み
   'も':[ {yMin:50,yMax:125,xMin:55,xMax:215},    // ①縦の曲がり棒
@@ -265,9 +265,9 @@ const ORDER=['あ','い','う','え','お',
              'わ','を','ん'];
 
 const LV={
-  easy:  {label:'かんたん',  alpha:.50, fontSize:240, hr:32, thr:.30, ord:false},
-  normal:{label:'ふつう',    alpha:.42, fontSize:240, hr:26, thr:.38, ord:true},
-  hard:  {label:'むずかしい',alpha:.28, fontSize:240, hr:20, thr:.48, ord:true},
+  easy:  {label:'かんたん',  alpha:.50, fontSize:240, hr:38, thr:.30, ord:false},
+  normal:{label:'ふつう',    alpha:.42, fontSize:240, hr:32, thr:.38, ord:true},
+  hard:  {label:'むずかしい',alpha:.28, fontSize:240, hr:26, thr:.48, ord:true},
 };
 const NUMS=['①','②','③','④','⑤','⑥'];
 
@@ -417,8 +417,9 @@ dCvs.addEventListener('touchmove',onMove,{passive:false});
 dCvs.addEventListener('touchend',onEnd);
 
 function onStart(e){
-  e.preventDefault(); drawing=true;
-  if(!checkOrd()){drawing=false;return;}
+  e.preventDefault();
+  if(!checkOrd()){return;}
+  drawing=true;
   const{x,y}=getPos(e);
   dCtx.beginPath(); dCtx.arc(x,y,9,0,Math.PI*2); dCtx.fill();
   dCtx.beginPath(); dCtx.moveTo(x,y);
@@ -465,7 +466,7 @@ function doHit(x,y){
 
 /* ストローク自動進行 */
 /* 1画あたり最低このポイント数なぞれば「完了」とみなす */
-const STROKE_MIN_HIT = 1; /* 1点でもヒットすれば画完了 */
+const STROKE_MIN_HIT = 8; /* 8点以上ヒットで画完了 */
 function autoAdv(){
   const soDef=STROKE_ORDER[curCh]||[];
   if(curSt>=soDef.length)return;
