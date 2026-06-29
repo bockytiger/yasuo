@@ -125,6 +125,81 @@
         let missiles = [];
         let stars = [];
         let gameOverTimer = 0;
+        let feedback = null; // { type: 'correct' | 'wrong', x, y, timer }
+
+        // ===== 効果音（Web Audio APIで合成。音声ファイル不要） =====
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playLaserSound() {
+            const t = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(900, t);
+            osc.frequency.exponentialRampToValueAtTime(200, t + 0.15);
+            gain.gain.setValueAtTime(0.15, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(t);
+            osc.stop(t + 0.15);
+        }
+
+        function playCorrectSound() {
+            // 明るい上昇アルペジオ（ピンポン的な正解音）
+            const t = audioCtx.currentTime;
+            const freqs = [523.25, 659.25, 783.99, 1046.5]; // C5 E5 G5 C6
+            freqs.forEach((f, i) => {
+                const start = t + i * 0.08;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(f, start);
+                gain.gain.setValueAtTime(0.0001, start);
+                gain.gain.exponentialRampToValueAtTime(0.25, start + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.001, start + 0.25);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(start);
+                osc.stop(start + 0.26);
+            });
+        }
+
+        function playExplosionSound() {
+            // ノイズ + 低音の爆発音（不正解時）
+            const t = audioCtx.currentTime;
+            const bufferSize = audioCtx.sampleRate * 0.4;
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+            }
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = buffer;
+            const noiseFilter = audioCtx.createBiquadFilter();
+            noiseFilter.type = 'lowpass';
+            noiseFilter.frequency.setValueAtTime(1200, t);
+            noiseFilter.frequency.exponentialRampToValueAtTime(80, t + 0.4);
+            const noiseGain = audioCtx.createGain();
+            noiseGain.gain.setValueAtTime(0.5, t);
+            noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+            noise.connect(noiseFilter);
+            noiseFilter.connect(noiseGain);
+            noiseGain.connect(audioCtx.destination);
+            noise.start(t);
+
+            const osc = audioCtx.createOscillator();
+            const oscGain = audioCtx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(150, t);
+            osc.frequency.exponentialRampToValueAtTime(40, t + 0.3);
+            oscGain.gain.setValueAtTime(0.3, t);
+            oscGain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+            osc.connect(oscGain);
+            oscGain.connect(audioCtx.destination);
+            osc.start(t);
+            osc.stop(t + 0.3);
+        }
 
         // 星の生成
         for (let i = 0; i < 100; i++) {
@@ -198,6 +273,7 @@
         document.getElementById('advanced').addEventListener('click', () => startGame('advanced'));
 
         function startGame(lvl) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
             level = lvl;
             generateProblems(level);
             currentQuestion = 0;
@@ -233,6 +309,7 @@
         // クリックでミサイル発射
         canvas.addEventListener('click', () => {
             if (gameState !== 'playing') return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
             missiles.push({
                 x: fighter.x + fighter.width / 2 - 3,
                 y: fighter.y,
@@ -240,6 +317,7 @@
                 height: 20,
                 speed: 8
             });
+            playLaserSound();
         });
 
         // 描画関数
@@ -285,24 +363,29 @@
         }
 
         function drawMeteor(choice) {
+            // 隕石の岩の部分だけ回転させる（数字は回転させない）
             ctx.save();
             ctx.translate(choice.x + choice.width / 2, choice.y + choice.height / 2);
             ctx.rotate(choice.rotation);
-            
-            // 隕石の形
+
+            // 隕石の形（毎フレーム形が変わらないよう、固定の頂点を使う）
+            if (!choice.rockPoints) {
+                choice.rockPoints = [];
+                for (let i = 0; i < 8; i++) {
+                    const angle = (i / 8) * Math.PI * 2;
+                    const radius = 40 + Math.random() * 10;
+                    choice.rockPoints.push({ x: Math.cos(angle) * radius, y: Math.sin(angle) * radius });
+                }
+            }
             ctx.fillStyle = '#8B4513';
             ctx.beginPath();
-            for (let i = 0; i < 8; i++) {
-                const angle = (i / 8) * Math.PI * 2;
-                const radius = 40 + Math.random() * 10;
-                const x = Math.cos(angle) * radius;
-                const y = Math.sin(angle) * radius;
-                if (i === 0) ctx.moveTo(x, y);
-                else ctx.lineTo(x, y);
-            }
+            choice.rockPoints.forEach((p, i) => {
+                if (i === 0) ctx.moveTo(p.x, p.y);
+                else ctx.lineTo(p.x, p.y);
+            });
             ctx.closePath();
             ctx.fill();
-            
+
             // クレーター
             ctx.fillStyle = '#654321';
             ctx.beginPath();
@@ -311,14 +394,39 @@
             ctx.beginPath();
             ctx.arc(10, 5, 6, 0, Math.PI * 2);
             ctx.fill();
-            
-            // 数字
-            ctx.fillStyle = 'white';
-            ctx.font = 'bold 32px Arial';
+
+            ctx.restore();
+
+            // 数字は回転させず常に正しい向きで表示する（6と9の見分けやすさのため）
+            ctx.save();
+            ctx.translate(choice.x + choice.width / 2, choice.y + choice.height / 2);
+
+            // 背後に白い円を敷いて数字を読みやすくする
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
+            ctx.beginPath();
+            ctx.arc(0, 0, 22, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // 数字（太字・大きめサイズで表示）
+            ctx.fillStyle = '#111';
+            ctx.font = 'bold 34px "Segoe UI", Verdana, Arial, sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(choice.value, 0, 0);
-            
+            ctx.fillText(choice.value, 0, 2);
+
+            // 9の下に小さな下線を引いて、6との違いを強調する
+            if (choice.value === 9) {
+                ctx.beginPath();
+                ctx.moveTo(-9, 14);
+                ctx.lineTo(9, 14);
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = '#111';
+                ctx.stroke();
+            }
+
             ctx.restore();
         }
 
@@ -327,6 +435,47 @@
             ctx.fillRect(missile.x, missile.y, missile.width, missile.height);
             ctx.fillStyle = '#ffff00';
             ctx.fillRect(missile.x + 1, missile.y, missile.width - 2, missile.height / 2);
+        }
+
+        function drawFeedback() {
+            if (!feedback) return;
+
+            feedback.timer++;
+            const progress = Math.min(feedback.timer / 12, 1); // 0→1 でポップイン
+            const scale = progress < 1 ? 1 + (1 - progress) * 0.8 : 1;
+            const fadeStart = 30;
+            let alpha = 1;
+            if (feedback.timer > fadeStart) {
+                alpha = Math.max(0, 1 - (feedback.timer - fadeStart) / 10);
+            }
+
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.translate(feedback.x, feedback.y);
+            ctx.scale(scale, scale);
+            ctx.lineWidth = 14;
+            ctx.lineCap = 'round';
+
+            if (feedback.type === 'correct') {
+                ctx.strokeStyle = '#ff3b3b';
+                ctx.beginPath();
+                ctx.arc(0, 0, 55, 0, Math.PI * 2);
+                ctx.stroke();
+            } else {
+                ctx.strokeStyle = '#2962ff';
+                ctx.beginPath();
+                ctx.moveTo(-45, -45);
+                ctx.lineTo(45, 45);
+                ctx.moveTo(45, -45);
+                ctx.lineTo(-45, 45);
+                ctx.stroke();
+            }
+
+            ctx.restore();
+
+            if (feedback.timer > fadeStart + 10) {
+                feedback = null;
+            }
         }
 
         function checkCollision(missile, choice) {
@@ -366,16 +515,29 @@
                         const choice = choices[j];
                         if (checkCollision(missile, choice)) {
                             missiles.splice(i, 1);
-                            
-                            if (choice.value === correctAnswer) {
+
+                            const isCorrect = choice.value === correctAnswer;
+                            feedback = {
+                                type: isCorrect ? 'correct' : 'wrong',
+                                x: choice.x + choice.width / 2,
+                                y: choice.y + choice.height / 2,
+                                timer: 0
+                            };
+
+                            if (isCorrect) {
                                 score++;
-                                currentQuestion++;
-                                setTimeout(() => loadQuestion(), 500);
+                                playCorrectSound();
                             } else {
-                                currentQuestion++;
-                                setTimeout(() => loadQuestion(), 500);
+                                playExplosionSound();
                             }
+                            currentQuestion++;
+                            gameState = 'feedback';
+                            setTimeout(() => {
+                                gameState = 'playing';
+                                loadQuestion();
+                            }, 900);
                             choices = [];
+                            missiles = [];
                             break;
                         }
                     }
@@ -388,6 +550,10 @@
                     currentQuestion++;
                     loadQuestion();
                 }
+            } else if (gameState === 'feedback') {
+                // 判定アニメーション表示中（ミサイル・隕石は止めて○×だけ見せる）
+                drawFighter();
+                drawFeedback();
             } else if (gameState === 'gameover') {
                 drawFighter();
                 
@@ -402,9 +568,30 @@
                 ctx.fillStyle = 'white';
                 ctx.font = '36px Arial';
                 ctx.fillText(`正解数: ${score} / 20`, canvas.width / 2, canvas.height / 2 + 20);
-                
+
+                let evalText = '';
+                let evalColor = '#ffffff';
+                const rate = score / 20;
+                if (score === 20) {
+                    evalText = 'パーフェクト　わり算マスター';
+                    evalColor = '#ffd700';
+                } else if (rate >= 0.9) {
+                    evalText = '合格';
+                    evalColor = '#00ff66';
+                } else if (rate >= 0.8) {
+                    evalText = '合格まであと少し';
+                    evalColor = '#ffaa00';
+                } else {
+                    evalText = '不合格';
+                    evalColor = '#ff4444';
+                }
+                ctx.fillStyle = evalColor;
+                ctx.font = 'bold 40px Arial';
+                ctx.fillText(evalText, canvas.width / 2, canvas.height / 2 + 65);
+
+                ctx.fillStyle = 'white';
                 ctx.font = '24px Arial';
-                ctx.fillText('クリックでメニューに戻る', canvas.width / 2, canvas.height / 2 + 80);
+                ctx.fillText('クリックでメニューに戻る', canvas.width / 2, canvas.height / 2 + 120);
                 
                 gameOverTimer++;
                 if (gameOverTimer > 60) {
