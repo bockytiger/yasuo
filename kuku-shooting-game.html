@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>九九シューティング</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+            background: #000;
+        }
+        #gameContainer {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #gameCanvas {
+            display: block;
+            background: #000;
+        }
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-size: 24px;
+            text-shadow: 2px 2px 4px #000;
+            z-index: 10;
+        }
+        #levelSelect {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 50, 0.9);
+            padding: 40px;
+            border-radius: 20px;
+            border: 3px solid #00ffff;
+            text-align: center;
+            z-index: 100;
+            width: 480px;
+        }
+        #levelSelect h1 {
+            color: #00ffff;
+            font-size: 32px;
+            margin-bottom: 15px;
+            text-shadow: 0 0 10px #00ffff;
+        }
+        #subtitle {
+            color: #ffffff;
+            font-size: 22px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        #themeLabel {
+            color: #ffffff;
+            font-size: 22px;
+            font-weight: bold;
+            margin-bottom: 12px;
+        }
+        #themeGrid {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 22px;
+        }
+        .themeBtn {
+            flex: 1;
+            padding: 14px 4px;
+            font-size: 16px;
+            font-weight: bold;
+            color: white;
+            background: linear-gradient(45deg, #444, #666);
+            border: 3px solid transparent;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-shadow: 1px 1px 2px #000;
+        }
+        .themeBtn:hover {
+            transform: scale(1.05);
+        }
+        .themeBtn.selected {
+            background: linear-gradient(45deg, #0097a7, #00bcd4);
+            border-color: #00ffff;
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.7);
+            transform: scale(1.06);
+        }
+        #danGrid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .danBtn {
+            padding: 18px 5px;
+            font-size: 22px;
+            font-weight: bold;
+            color: white;
+            background: linear-gradient(45deg, #3949ab, #5c6bc0);
+            border: 3px solid transparent;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-shadow: 1px 1px 2px #000;
+        }
+        .danBtn:hover {
+            transform: scale(1.06);
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.4);
+        }
+        .danBtn.selected {
+            background: linear-gradient(45deg, #ff6f00, #ffca28);
+            border-color: #00ffff;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.8);
+            transform: scale(1.08);
+        }
+        #selectedInfo {
+            color: #00ffff;
+            font-size: 17px;
+            margin-bottom: 20px;
+            min-height: 24px;
+        }
+        .levelBtn {
+            display: block;
+            width: 250px;
+            margin: 15px auto 0;
+            padding: 15px 30px;
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-shadow: 1px 1px 2px #000;
+        }
+        .levelBtn:hover:not(:disabled) {
+            transform: scale(1.1);
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+        }
+        #startBtn {
+            background: linear-gradient(45deg, #4CAF50, #8BC34A);
+        }
+        #startBtn:disabled {
+            background: #555;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div id="levelSelect">
+            <h1>🚀 九九シューティング 🚀</h1>
+            <div id="subtitle">練習したい段を選んでください。<br>（最大3つまで）</div>
+            <div id="danGrid">
+                <button class="danBtn" data-dan="1">1の段</button>
+                <button class="danBtn" data-dan="2">2の段</button>
+                <button class="danBtn" data-dan="3">3の段</button>
+                <button class="danBtn" data-dan="4">4の段</button>
+                <button class="danBtn" data-dan="5">5の段</button>
+                <button class="danBtn" data-dan="6">6の段</button>
+                <button class="danBtn" data-dan="7">7の段</button>
+                <button class="danBtn" data-dan="8">8の段</button>
+                <button class="danBtn" data-dan="9">9の段</button>
+            </div>
+            <div id="selectedInfo">選択中: なし</div>
+            <div id="themeLabel">バトルフィールドを選んでください。</div>
+            <div id="themeGrid">
+                <button class="themeBtn selected" data-theme="space">🚀 宇宙</button>
+                <button class="themeBtn" data-theme="underwater">🌊 海中</button>
+                <button class="themeBtn" data-theme="desert">🏜️ さばく</button>
+            </div>
+            <button id="startBtn" class="levelBtn" disabled>スタート</button>
+        </div>
+        <div id="ui" class="hidden">
+            <div>問題: <span id="currentQ">1</span>/<span id="totalQ">9</span></div>
+            <div>正解数: <span id="score">0</span></div>
+            <div id="problem" style="font-size: 44px; margin-top: 10px;"></div>
+        </div>
+        <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 900;
+        canvas.height = 700;
+
+        const ui = document.getElementById('ui');
+        const levelSelect = document.getElementById('levelSelect');
+        const problemDiv = document.getElementById('problem');
+        const currentQDiv = document.getElementById('currentQ');
+        const totalQDiv = document.getElementById('totalQ');
+        const scoreDiv = document.getElementById('score');
+
+        let gameState = 'menu';
+        let theme = 'space'; // 'space' | 'underwater' | 'desert'
+        let selectedDans = [];
+        let currentQuestion = 0;
+        let score = 0;
+        let problems = [];
+        let choices = [];
+        let correctAnswer = 0;
+        let fighter = { x: 450, y: 600, width: 50, height: 50 };
+        let missiles = [];
+        let stars = [];
+        let bgGradient = null;
+        let gameOverTimer = 0;
+        let feedback = null; // { type: 'correct' | 'wrong', x, y, timer }
+
+        const THEME_CONFIG = {
+            space:      { bgTop: '#1a0033', bgBottom: '#000000' },
+            underwater: { bgTop: '#0b5f7a', bgBottom: '#00121e' },
+            desert:     { bgTop: '#ffcf7a', bgBottom: '#8a5a2b' }
+        };
+
+        // ===== 効果音（Web Audio APIで合成。音声ファイル不要） =====
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playLaserSound() {
+            const t = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(900, t);
+            osc.frequency.exponentialRampToValueAtTime(200, t + 0.15);
+            gain.gain.setValueAtTime(0.15, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(t);
+            osc.stop(t + 0.15);
+        }
+
+        function playCorrectSound() {
+            // 明るい上昇アルペジオ（ピンポン的な正解音）
+            const t = audioCtx.currentTime;
+            const freqs = [523.25, 659.25, 783.99, 1046.5]; // C5 E5 G5 C6
+            freqs.forEach((f, i) => {
+                const start = t + i * 0.08;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(f, start);
+                gain.gain.setValueAtTime(0.0001, start);
+                gain.gain.exponentialRampToValueAtTime(0.25, start + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.001, start + 0.25);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(start);
+                osc.stop(start + 0.26);
+            });
+        }
+
+        function playExplosionSound() {
+            // ノイズ + 低音の爆発音（不正解時）
+            const t = audioCtx.currentTime;
+            const bufferSize = audioCtx.sampleRate * 0.4;
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+            }
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = buffer;
+            const noiseFilter = audioCtx.createBiquadFilter();
+            noiseFilter.type = 'lowpass';
+            noiseFilter.frequency.setValueAtTime(1200, t);
+            noiseFilter.frequency.exponentialRampToValueAtTime(80, t + 0.4);
+            const noiseGain = audioCtx.createGain();
+            noiseGain.gain.setValueAtTime(0.5, t);
+            noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+            noise.connect(noiseFilter);
+            noiseFilter.connect(noiseGain);
+            noiseGain.connect(audioCtx.destination);
+            noise.start(t);
+
+            const osc = audioCtx.createOscillator();
+            const oscGain = audioCtx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(150, t);
+            osc.frequency.exponentialRampToValueAtTime(40, t + 0.3);
+            oscGain.gain.setValueAtTime(0.3, t);
+            oscGain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+            osc.connect(oscGain);
+            oscGain.connect(audioCtx.destination);
+            osc.start(t);
+            osc.stop(t + 0.3);
+        }
+
+        // 背景グラデーションの生成（テーマごと）
+        function updateBackgroundGradient() {
+            const cfg = THEME_CONFIG[theme];
+            bgGradient = ctx.createRadialGradient(
+                canvas.width / 2, canvas.height / 2, 50,
+                canvas.width / 2, canvas.height / 2, canvas.width * 0.8
+            );
+            bgGradient.addColorStop(0, cfg.bgTop);
+            bgGradient.addColorStop(1, cfg.bgBottom);
+        }
+
+        // 背景の粒子（星・気泡・砂ぼこり）の生成
+        function generateParticles() {
+            stars = [];
+            const count = theme === 'space' ? 100 : 55;
+            for (let i = 0; i < count; i++) {
+                if (theme === 'space') {
+                    stars.push({
+                        x: Math.random() * canvas.width,
+                        y: Math.random() * canvas.height,
+                        size: Math.random() * 2,
+                        speed: Math.random() * 0.5 + 0.2
+                    });
+                } else {
+                    stars.push({
+                        x: Math.random() * canvas.width,
+                        y: Math.random() * canvas.height,
+                        size: Math.random() * 3 + (theme === 'underwater' ? 2 : 1),
+                        speed: Math.random() * 0.6 + 0.25,
+                        wobble: Math.random() * Math.PI * 2
+                    });
+                }
+            }
+        }
+
+        updateBackgroundGradient();
+        generateParticles();
+
+        // テーマ選択ボタンの処理（単一選択）
+        const themeButtons = document.querySelectorAll('.themeBtn');
+        themeButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                themeButtons.forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+                theme = btn.dataset.theme;
+            });
+        });
+
+        // 段選択ボタンの処理（最大3つまで）
+        const danButtons = document.querySelectorAll('.danBtn');
+        const selectedInfo = document.getElementById('selectedInfo');
+        const startBtn = document.getElementById('startBtn');
+
+        danButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const dan = parseInt(btn.dataset.dan);
+                const idx = selectedDans.indexOf(dan);
+                if (idx >= 0) {
+                    selectedDans.splice(idx, 1);
+                    btn.classList.remove('selected');
+                } else {
+                    if (selectedDans.length >= 3) return; // 最大3つまで
+                    selectedDans.push(dan);
+                    btn.classList.add('selected');
+                }
+                updateSelectedInfo();
+            });
+        });
+
+        function updateSelectedInfo() {
+            if (selectedDans.length === 0) {
+                selectedInfo.textContent = '選択中: なし';
+                startBtn.disabled = true;
+            } else {
+                const sorted = [...selectedDans].sort((a, b) => a - b);
+                selectedInfo.textContent = `選択中: ${sorted.join('・')}の段（全${sorted.length * 9}問）`;
+                startBtn.disabled = false;
+            }
+        }
+
+        // 問題生成（選択した段それぞれ9問、ランダムな順番で出題）
+        function generateProblems() {
+            problems = [];
+            selectedDans.forEach(dan => {
+                for (let i = 1; i <= 9; i++) {
+                    problems.push({ a: dan, b: i, answer: dan * i });
+                }
+            });
+            // シャッフル
+            for (let i = problems.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [problems[i], problems[j]] = [problems[j], problems[i]];
+            }
+        }
+
+        // 選択肢生成
+        function generateChoices() {
+            const correct = problems[currentQuestion].answer;
+            const wrongAnswers = new Set();
+
+            while (wrongAnswers.size < 3) {
+                const wrong = correct + Math.floor(Math.random() * 7) - 3;
+                if (wrong !== correct && wrong > 0) {
+                    wrongAnswers.add(wrong);
+                }
+            }
+
+            const allChoices = [correct, ...Array.from(wrongAnswers)];
+            allChoices.sort(() => Math.random() - 0.5);
+
+            correctAnswer = correct;
+
+            choices = allChoices.map((ans, i) => ({
+                value: ans,
+                x: 130 + i * 190,
+                y: -100 - i * 80,
+                width: 120,
+                height: 100,
+                speed: 1.5 + Math.random() * 0.5,
+                rotation: 0,
+                rotSpeed: (Math.random() - 0.5) * 0.05
+            }));
+        }
+
+        // スタートボタン
+        startBtn.addEventListener('click', () => {
+            if (selectedDans.length === 0) return;
+            startGame();
+        });
+
+        function startGame() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            updateBackgroundGradient();
+            generateParticles();
+            generateProblems();
+            currentQuestion = 0;
+            score = 0;
+            gameState = 'playing';
+            levelSelect.classList.add('hidden');
+            ui.classList.remove('hidden');
+            loadQuestion();
+        }
+
+        function loadQuestion() {
+            if (currentQuestion >= problems.length) {
+                gameState = 'gameover';
+                return;
+            }
+
+            const prob = problems[currentQuestion];
+            problemDiv.textContent = `${prob.a} × ${prob.b} = ?`;
+            currentQDiv.textContent = currentQuestion + 1;
+            totalQDiv.textContent = problems.length;
+            scoreDiv.textContent = score;
+            generateChoices();
+            missiles = [];
+        }
+
+        // マウス移動
+        canvas.addEventListener('mousemove', (e) => {
+            if (gameState !== 'playing') return;
+            const rect = canvas.getBoundingClientRect();
+            fighter.x = e.clientX - rect.left - fighter.width / 2;
+            fighter.x = Math.max(0, Math.min(canvas.width - fighter.width, fighter.x));
+        });
+
+        // クリックでミサイル発射
+        canvas.addEventListener('click', () => {
+            if (gameState !== 'playing') return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            missiles.push({
+                x: fighter.x + fighter.width / 2 - 3,
+                y: fighter.y,
+                width: 6,
+                height: 20,
+                speed: 8
+            });
+            playLaserSound();
+        });
+
+        // ===== 背景演出（テーマごと） =====
+        function drawSceneDecor() {
+            if (theme === 'underwater') {
+                // 差し込む光
+                ctx.save();
+                ctx.globalAlpha = 0.07;
+                ctx.fillStyle = '#ffffff';
+                for (let i = 0; i < 5; i++) {
+                    const rx = (i / 5) * canvas.width + 60;
+                    ctx.beginPath();
+                    ctx.moveTo(rx, 0);
+                    ctx.lineTo(rx + 70, 0);
+                    ctx.lineTo(rx - 50, canvas.height);
+                    ctx.lineTo(rx - 120, canvas.height);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+                ctx.restore();
+                // 海底
+                ctx.fillStyle = '#012a3a';
+                ctx.beginPath();
+                ctx.moveTo(0, canvas.height);
+                ctx.lineTo(0, canvas.height - 35);
+                for (let x = 0; x <= canvas.width; x += 60) {
+                    ctx.lineTo(x + 30, canvas.height - 55 - Math.sin(x * 0.05) * 10);
+                }
+                ctx.lineTo(canvas.width, canvas.height);
+                ctx.closePath();
+                ctx.fill();
+                // 海藻
+                ctx.strokeStyle = '#0a5c3c';
+                ctx.lineWidth = 6;
+                ctx.lineCap = 'round';
+                [70, 230, 620, 810].forEach((wx, i) => {
+                    ctx.beginPath();
+                    ctx.moveTo(wx, canvas.height - 15);
+                    ctx.quadraticCurveTo(wx + (i % 2 === 0 ? 18 : -18), canvas.height - 65, wx - 8, canvas.height - 110);
+                    ctx.stroke();
+                });
+            } else if (theme === 'desert') {
+                // 太陽
+                ctx.save();
+                ctx.fillStyle = 'rgba(255, 240, 190, 0.9)';
+                ctx.beginPath();
+                ctx.arc(canvas.width - 130, 110, 55, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+                // 遠くのピラミッド
+                ctx.fillStyle = 'rgba(130, 90, 45, 0.55)';
+                ctx.beginPath();
+                ctx.moveTo(100, 420); ctx.lineTo(190, 300); ctx.lineTo(280, 420); ctx.closePath(); ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(580, 420); ctx.lineTo(690, 270); ctx.lineTo(800, 420); ctx.closePath(); ctx.fill();
+                // 砂丘
+                ctx.fillStyle = '#c9974f';
+                ctx.beginPath();
+                ctx.moveTo(0, canvas.height);
+                ctx.lineTo(0, canvas.height - 30);
+                ctx.quadraticCurveTo(canvas.width * 0.3, canvas.height - 70, canvas.width * 0.55, canvas.height - 25);
+                ctx.quadraticCurveTo(canvas.width * 0.8, canvas.height + 10, canvas.width, canvas.height - 40);
+                ctx.lineTo(canvas.width, canvas.height);
+                ctx.closePath();
+                ctx.fill();
+            }
+        }
+
+        function drawParticles() {
+            if (theme === 'space') {
+                stars.forEach(star => {
+                    ctx.fillStyle = 'white';
+                    ctx.beginPath();
+                    ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+                    ctx.fill();
+                    star.y += star.speed;
+                    if (star.y > canvas.height) {
+                        star.y = 0;
+                        star.x = Math.random() * canvas.width;
+                    }
+                });
+            } else if (theme === 'underwater') {
+                stars.forEach(p => {
+                    p.wobble += 0.05;
+                    const wx = p.x + Math.sin(p.wobble) * 6;
+                    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+                    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.arc(wx, p.y, p.size, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+                    p.y -= p.speed;
+                    if (p.y < -10) {
+                        p.y = canvas.height + 10;
+                        p.x = Math.random() * canvas.width;
+                    }
+                });
+            } else if (theme === 'desert') {
+                stars.forEach(p => {
+                    p.wobble += 0.03;
+                    const wx = p.x + Math.sin(p.wobble) * 4;
+                    ctx.fillStyle = 'rgba(255, 224, 160, 0.55)';
+                    ctx.beginPath();
+                    ctx.arc(wx, p.y, p.size, 0, Math.PI * 2);
+                    ctx.fill();
+                    p.y -= p.speed * 0.6;
+                    if (p.y < -10) {
+                        p.y = canvas.height + 10;
+                        p.x = Math.random() * canvas.width;
+                    }
+                });
+            }
+        }
+
+        // ===== プレイヤー（テーマごと） =====
+        function drawPlayer() {
+            if (theme === 'underwater') drawSubmarine();
+            else if (theme === 'desert') drawTank();
+            else drawSpaceship();
+        }
+
+        function drawSpaceship() {
+            ctx.save();
+            ctx.translate(fighter.x + fighter.width / 2, fighter.y + fighter.height / 2);
+
+            ctx.fillStyle = '#00ccff';
+            ctx.beginPath();
+            ctx.moveTo(0, -25);
+            ctx.lineTo(-20, 25);
+            ctx.lineTo(20, 25);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = '#ffff00';
+            ctx.beginPath();
+            ctx.arc(0, 0, 8, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#0099cc';
+            ctx.fillRect(-25, 10, 50, 5);
+
+            ctx.restore();
+        }
+
+        function drawSubmarine() {
+            ctx.save();
+            ctx.translate(fighter.x + fighter.width / 2, fighter.y + fighter.height / 2);
+
+            // 船体
+            ctx.fillStyle = '#4a5d23';
+            ctx.beginPath();
+            ctx.ellipse(0, 8, 32, 16, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 艦橋（セイル）
+            ctx.fillStyle = '#3a4a1c';
+            ctx.fillRect(-9, -14, 18, 22);
+
+            // 潜望鏡
+            ctx.strokeStyle = '#222';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(0, -14);
+            ctx.lineTo(0, -26);
+            ctx.stroke();
+
+            // 舷窓
+            ctx.fillStyle = '#aeeaff';
+            [-16, 0, 16].forEach(px => {
+                ctx.beginPath();
+                ctx.arc(px, 8, 4, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // フィン
+            ctx.fillStyle = '#3a4a1c';
+            ctx.beginPath();
+            ctx.moveTo(-32, 8); ctx.lineTo(-42, 2); ctx.lineTo(-30, 0); ctx.closePath(); ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(32, 8); ctx.lineTo(42, 2); ctx.lineTo(30, 0); ctx.closePath(); ctx.fill();
+
+            ctx.restore();
+        }
+
+        function drawTank() {
+            ctx.save();
+            ctx.translate(fighter.x + fighter.width / 2, fighter.y + fighter.height / 2);
+
+            // 砲身
+            ctx.fillStyle = '#333';
+            ctx.fillRect(-4, -38, 8, 30);
+
+            // 砲塔
+            ctx.fillStyle = '#4a5a30';
+            ctx.beginPath();
+            ctx.arc(0, -8, 15, Math.PI, 0);
+            ctx.fill();
+
+            // 車体
+            ctx.fillStyle = '#5a6b3d';
+            ctx.fillRect(-28, -6, 56, 24);
+
+            // 履帯
+            ctx.fillStyle = '#222';
+            ctx.fillRect(-31, 15, 62, 9);
+            ctx.fillStyle = '#111';
+            for (let wx = -24; wx <= 24; wx += 12) {
+                ctx.beginPath();
+                ctx.arc(wx, 19, 5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            ctx.restore();
+        }
+
+        // ===== 敵オブジェクト（テーマごと） =====
+        function drawObstacle(choice) {
+            if (theme === 'underwater') drawTorpedo(choice);
+            else if (theme === 'desert') drawPyramidRock(choice);
+            else drawMeteor(choice);
+            drawNumberBadge(choice);
+        }
+
+        function drawMeteor(choice) {
+            // 隕石の岩の部分だけ回転させる（数字は回転させない）
+            ctx.save();
+            ctx.translate(choice.x + choice.width / 2, choice.y + choice.height / 2);
+            ctx.rotate(choice.rotation);
+
+            // 隕石の形（毎フレーム形が変わらないよう、固定の頂点を使う）
+            if (!choice.rockPoints) {
+                choice.rockPoints = [];
+                for (let i = 0; i < 8; i++) {
+                    const angle = (i / 8) * Math.PI * 2;
+                    const radius = 48 + Math.random() * 12;
+                    choice.rockPoints.push({ x: Math.cos(angle) * radius, y: Math.sin(angle) * radius });
+                }
+            }
+            ctx.fillStyle = '#8B4513';
+            ctx.beginPath();
+            choice.rockPoints.forEach((p, i) => {
+                if (i === 0) ctx.moveTo(p.x, p.y);
+                else ctx.lineTo(p.x, p.y);
+            });
+            ctx.closePath();
+            ctx.fill();
+
+            // クレーター
+            ctx.fillStyle = '#654321';
+            ctx.beginPath();
+            ctx.arc(-18, -12, 9, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(12, 6, 7, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        function drawTorpedo(choice) {
+            // 魚雷本体は左右にわずかに揺れる程度で、大きく回転はさせない
+            ctx.save();
+            ctx.translate(choice.x + choice.width / 2, choice.y + choice.height / 2);
+            ctx.rotate(choice.rotation * 0.2);
+
+            ctx.fillStyle = '#5c6670';
+            ctx.beginPath();
+            ctx.moveTo(-16, -48);
+            ctx.lineTo(16, -48);
+            ctx.lineTo(16, 28);
+            ctx.quadraticCurveTo(16, 50, 0, 56);
+            ctx.quadraticCurveTo(-16, 50, -16, 28);
+            ctx.closePath();
+            ctx.fill();
+
+            // 警戒ストライプ
+            ctx.fillStyle = '#d64545';
+            ctx.fillRect(-16, -8, 32, 10);
+
+            // 尾翼
+            ctx.fillStyle = '#3d4750';
+            ctx.beginPath();
+            ctx.moveTo(-16, -48); ctx.lineTo(-30, -58); ctx.lineTo(-16, -32); ctx.closePath(); ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(16, -48); ctx.lineTo(30, -58); ctx.lineTo(16, -32); ctx.closePath(); ctx.fill();
+
+            ctx.restore();
+        }
+
+        function drawPyramidRock(choice) {
+            // ピラミッド状の巨大な石。ゆっくりとした転がりのみ
+            ctx.save();
+            ctx.translate(choice.x + choice.width / 2, choice.y + choice.height / 2);
+            ctx.rotate(choice.rotation * 0.15);
+
+            ctx.fillStyle = '#d2a679';
+            ctx.beginPath();
+            ctx.moveTo(0, -55);
+            ctx.lineTo(50, 45);
+            ctx.lineTo(-50, 45);
+            ctx.closePath();
+            ctx.fill();
+
+            // 陰影面
+            ctx.fillStyle = '#b8895a';
+            ctx.beginPath();
+            ctx.moveTo(0, -55);
+            ctx.lineTo(50, 45);
+            ctx.lineTo(0, 45);
+            ctx.closePath();
+            ctx.fill();
+
+            // 石積みのライン
+            ctx.strokeStyle = 'rgba(90, 60, 30, 0.4)';
+            ctx.lineWidth = 1;
+            for (let i = 1; i < 5; i++) {
+                const t = i / 5;
+                ctx.beginPath();
+                ctx.moveTo(-50 * (1 - t), -55 + 100 * t);
+                ctx.lineTo(50 * (1 - t), -55 + 100 * t);
+                ctx.stroke();
+            }
+
+            ctx.restore();
+        }
+
+        function drawNumberBadge(choice) {
+            // 数字は回転させず常に正しい向きで表示する（6と9の見分けやすさのため）
+            ctx.save();
+            ctx.translate(choice.x + choice.width / 2, choice.y + choice.height / 2);
+
+            // 背後に白い円を敷いて数字を読みやすくする
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
+            ctx.beginPath();
+            ctx.arc(0, 0, 28, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // 数字（太字・大きめサイズで表示）
+            ctx.fillStyle = '#111';
+            ctx.font = 'bold 42px "Segoe UI", Verdana, Arial, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(choice.value, 0, 3);
+
+            // 9の下に小さな下線を引いて、6との違いを強調する
+            if (choice.value === 9) {
+                ctx.beginPath();
+                ctx.moveTo(-11, 18);
+                ctx.lineTo(11, 18);
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = '#111';
+                ctx.stroke();
+            }
+
+            ctx.restore();
+        }
+
+        // ===== 発射する弾（テーマごと） =====
+        function drawProjectile(missile) {
+            if (theme === 'underwater') {
+                ctx.fillStyle = 'rgba(210, 245, 255, 0.9)';
+                ctx.beginPath();
+                ctx.ellipse(missile.x + missile.width / 2, missile.y + missile.height / 2, missile.width / 2 + 2, missile.height / 2 + 4, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            } else if (theme === 'desert') {
+                ctx.fillStyle = 'rgba(255, 170, 70, 0.55)';
+                ctx.fillRect(missile.x + 1, missile.y + missile.height / 2, missile.width - 2, missile.height / 2);
+                ctx.fillStyle = '#2b2b2b';
+                ctx.beginPath();
+                ctx.arc(missile.x + missile.width / 2, missile.y + missile.height / 2, missile.width / 2 + 1, 0, Math.PI * 2);
+                ctx.fill();
+            } else {
+                ctx.fillStyle = '#ff0000';
+                ctx.fillRect(missile.x, missile.y, missile.width, missile.height);
+                ctx.fillStyle = '#ffff00';
+                ctx.fillRect(missile.x + 1, missile.y, missile.width - 2, missile.height / 2);
+            }
+        }
+
+        function drawFeedback() {
+            if (!feedback) return;
+
+            feedback.timer++;
+            const progress = Math.min(feedback.timer / 12, 1); // 0→1 でポップイン
+            const scale = progress < 1 ? 1 + (1 - progress) * 0.8 : 1;
+            const fadeStart = 30;
+            let alpha = 1;
+            if (feedback.timer > fadeStart) {
+                alpha = Math.max(0, 1 - (feedback.timer - fadeStart) / 10);
+            }
+
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.translate(feedback.x, feedback.y);
+            ctx.scale(scale, scale);
+            ctx.lineWidth = 14;
+            ctx.lineCap = 'round';
+
+            if (feedback.type === 'correct') {
+                ctx.strokeStyle = '#ff3b3b';
+                ctx.beginPath();
+                ctx.arc(0, 0, 55, 0, Math.PI * 2);
+                ctx.stroke();
+            } else {
+                ctx.strokeStyle = '#2962ff';
+                ctx.beginPath();
+                ctx.moveTo(-45, -45);
+                ctx.lineTo(45, 45);
+                ctx.moveTo(45, -45);
+                ctx.lineTo(-45, 45);
+                ctx.stroke();
+            }
+
+            ctx.restore();
+
+            if (feedback.timer > fadeStart + 10) {
+                feedback = null;
+            }
+        }
+
+        function checkCollision(missile, choice) {
+            return missile.x < choice.x + choice.width &&
+                   missile.x + missile.width > choice.x &&
+                   missile.y < choice.y + choice.height &&
+                   missile.y + missile.height > choice.y;
+        }
+
+        function gameLoop() {
+            ctx.fillStyle = bgGradient || '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            drawSceneDecor();
+            drawParticles();
+
+            if (gameState === 'playing') {
+                // 選択肢の更新と描画
+                choices.forEach(choice => {
+                    choice.y += choice.speed;
+                    choice.rotation += choice.rotSpeed;
+                    drawObstacle(choice);
+                });
+
+                // ミサイルの更新と描画
+                for (let i = missiles.length - 1; i >= 0; i--) {
+                    const missile = missiles[i];
+                    missile.y -= missile.speed;
+                    drawProjectile(missile);
+
+                    if (missile.y < -20) {
+                        missiles.splice(i, 1);
+                        continue;
+                    }
+
+                    // 衝突判定
+                    for (let j = choices.length - 1; j >= 0; j--) {
+                        const choice = choices[j];
+                        if (checkCollision(missile, choice)) {
+                            missiles.splice(i, 1);
+
+                            const isCorrect = choice.value === correctAnswer;
+                            feedback = {
+                                type: isCorrect ? 'correct' : 'wrong',
+                                x: choice.x + choice.width / 2,
+                                y: choice.y + choice.height / 2,
+                                timer: 0
+                            };
+
+                            if (isCorrect) {
+                                score++;
+                                playCorrectSound();
+                            } else {
+                                playExplosionSound();
+                            }
+                            currentQuestion++;
+                            gameState = 'feedback';
+                            setTimeout(() => {
+                                gameState = 'playing';
+                                loadQuestion();
+                            }, 900);
+                            choices = [];
+                            missiles = [];
+                            break;
+                        }
+                    }
+                }
+
+                drawPlayer();
+
+                // 選択肢が画面外に出たら次の問題
+                if (choices.length > 0 && choices.every(c => c.y > canvas.height)) {
+                    currentQuestion++;
+                    loadQuestion();
+                }
+            } else if (gameState === 'feedback') {
+                // 判定アニメーション表示中（ミサイル・隕石は止めて○×だけ見せる）
+                drawPlayer();
+                drawFeedback();
+            } else if (gameState === 'gameover') {
+                drawPlayer();
+
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                ctx.fillStyle = '#00ffff';
+                ctx.font = 'bold 48px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('ゲーム終了！', canvas.width / 2, canvas.height / 2 - 50);
+
+                const total = problems.length;
+                ctx.fillStyle = 'white';
+                ctx.font = '36px Arial';
+                ctx.fillText(`正解数: ${score} / ${total}`, canvas.width / 2, canvas.height / 2 + 20);
+
+                let evalText = '';
+                let evalColor = '#ffffff';
+                const rate = total > 0 ? score / total : 0;
+                if (score === total && total > 0) {
+                    evalText = 'パーフェクト　九九マスター';
+                    evalColor = '#ffd700';
+                } else if (rate >= 0.9) {
+                    evalText = '合格';
+                    evalColor = '#00ff66';
+                } else if (rate >= 0.8) {
+                    evalText = '合格まであと少し';
+                    evalColor = '#ffaa00';
+                } else {
+                    evalText = '不合格';
+                    evalColor = '#ff4444';
+                }
+                ctx.fillStyle = evalColor;
+                ctx.font = 'bold 40px Arial';
+                ctx.fillText(evalText, canvas.width / 2, canvas.height / 2 + 65);
+
+                ctx.fillStyle = 'white';
+                ctx.font = '24px Arial';
+                ctx.fillText('クリックでメニューに戻る', canvas.width / 2, canvas.height / 2 + 120);
+
+                gameOverTimer++;
+                if (gameOverTimer > 60) {
+                    canvas.addEventListener('click', resetGame);
+                }
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function resetGame() {
+            canvas.removeEventListener('click', resetGame);
+            gameState = 'menu';
+            gameOverTimer = 0;
+            selectedDans = [];
+            danButtons.forEach(btn => btn.classList.remove('selected'));
+            updateSelectedInfo();
+            levelSelect.classList.remove('hidden');
+            ui.classList.add('hidden');
+        }
+
+        gameLoop();
+    </script>
+</body>
+</html>
