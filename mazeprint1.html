@@ -1,0 +1,2332 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>計算迷路教材メーカー</title>
+<style>
+/* ============================================================
+   style.css
+   計算迷路教材メーカーの全体スタイル。
+   編集画面・迷路画面・印刷用スタイルをまとめて管理する。
+   ============================================================ */
+
+:root {
+  --color-bg: #f5f3ec;
+  --color-panel: #ffffff;
+  --color-border: #d8d2c2;
+  --color-primary: #e8833a;
+  --color-primary-dark: #cf6f26;
+  --color-text: #3a3226;
+  --color-road: #6b5d4f;
+  --color-road-bg: #fdfaf3;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Hiragino Maru Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* ---------------- 編集画面 ---------------- */
+
+.app-header {
+  padding: 24px 32px 8px;
+}
+
+.app-header h1 {
+  margin: 0 0 4px;
+  font-size: 26px;
+}
+
+.app-subtitle {
+  margin: 0;
+  color: #756a58;
+  font-size: 14px;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 32px;
+}
+
+.toolbar-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.toolbar-item select {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  font-size: 14px;
+}
+
+.toolbar-item-title {
+  flex: 1 1 260px;
+}
+
+.toolbar-item-title input[type="text"] {
+  flex: 1;
+  min-width: 200px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  font-size: 14px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-panel);
+  color: var(--color-text);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.btn:hover {
+  background: #efe9db;
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  border-color: var(--color-primary-dark);
+  color: #fff;
+  font-weight: bold;
+}
+
+.btn-primary:hover {
+  background: var(--color-primary-dark);
+}
+
+.file-btn {
+  position: relative;
+  overflow: hidden;
+}
+
+.file-btn input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.problem-table-wrap {
+  padding: 8px 32px 40px;
+}
+
+.empty-notice {
+  color: #8a7c65;
+  font-style: italic;
+}
+
+#problem-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  background: var(--color-panel);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+#problem-table th,
+#problem-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+  vertical-align: middle;
+}
+
+/* 「問題」の入力欄を広めに、正解・誤答欄はそれよりやや狭めに割り当てる */
+#problem-table th:nth-child(1),
+#problem-table td:nth-child(1) {
+  width: 34%;
+}
+
+#problem-table th:nth-child(2),
+#problem-table td:nth-child(2),
+#problem-table th:nth-child(3),
+#problem-table td:nth-child(3),
+#problem-table th:nth-child(4),
+#problem-table td:nth-child(4) {
+  width: 12%;
+}
+
+#problem-table th:nth-child(5),
+#problem-table td:nth-child(5) {
+  width: 20%;
+}
+
+#problem-table th:nth-child(6),
+#problem-table td:nth-child(6) {
+  width: 10%;
+}
+
+#problem-table th {
+  background: #efe6d3;
+  font-size: 13px;
+  color: #6b5d47;
+}
+
+#problem-table input[type="text"] {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font-size: 15px;
+  box-sizing: border-box;
+}
+
+/* 「問題」欄は特に幅を取って入力しやすくする */
+#problem-table td:nth-child(1) input[type="text"] {
+  min-width: 100%;
+  font-size: 16px;
+}
+
+.monster-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+/* ネイティブのファイル選択ボタン（「選択されていません」等の表示が
+   欄の狭さで欠けて読めなくなる）を隠し、代わりにこのラベルを
+   ボタンとして見せる（JSON読込ボタンと同じ手法）。 */
+.monster-file-btn {
+  position: relative;
+  overflow: hidden;
+  padding: 6px 12px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.monster-file-btn input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.monster-preview {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  background: #fff;
+}
+
+.remove-btn {
+  border: none;
+  background: #f3d9d0;
+  color: #a13f2b;
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.remove-btn:hover {
+  background: #eec4b6;
+}
+
+/* ---------------- 迷路（教材）画面 ---------------- */
+
+.maze-toolbar {
+  display: flex;
+  gap: 12px;
+  padding: 16px 32px;
+}
+
+.maze-container {
+  display: flex;
+  justify-content: center;
+  padding: 0 16px 40px;
+}
+
+#maze-svg {
+  max-width: 900px;
+  width: 100%;
+  height: auto;
+  background: var(--color-road-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+/* SVG内の要素スタイル（通路・スタート/ゴール・問題ボックス・モンスター） */
+
+.maze-bg {
+  fill: var(--color-road-bg);
+}
+
+.road-rail {
+  stroke: var(--color-road);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.start-marker circle {
+  fill: #3fa34d;
+  stroke: #2c7a38;
+  stroke-width: 3;
+}
+
+.start-marker text,
+.goal-marker text {
+  fill: #fff;
+  font-size: 28px;
+  font-weight: bold;
+}
+
+.goal-marker circle {
+  fill: #d64545;
+  stroke: #a63232;
+  stroke-width: 3;
+}
+
+.problem-box-fill {
+  fill: #fffdf6;
+}
+
+/* 問題ボックスの枠線。入り口方向の辺だけは通路幅ぶんの隙間を開けて
+   描画されるため（renderer.js の _drawBoxBorder 参照）、入り口が
+   ひと目でわかるようになっている。 */
+.problem-box-border {
+  stroke: #4a6fa5;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.problem-question {
+  fill: #22314a;
+  font-size: 34px;
+  font-weight: bold;
+}
+
+.exit-label-bg {
+  fill: #fff6df;
+  stroke: #b79a5a;
+  stroke-width: 1.5;
+}
+
+.exit-label-text {
+  fill: #4a3c1e;
+  font-size: 27px;
+  font-weight: bold;
+}
+
+.print-title-text {
+  fill: var(--color-text);
+  font-size: 76px;
+  font-weight: bold;
+}
+
+.print-theme-text {
+  fill: #6b5d47;
+  font-size: 30px;
+  font-weight: bold;
+}
+
+.print-name-label {
+  fill: var(--color-text);
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.print-name-line {
+  stroke: var(--color-text);
+  stroke-width: 2;
+}
+
+.monster-img {
+  pointer-events: none;
+}
+
+/* ---------------- 印刷用スタイル ---------------- */
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  #maze-screen,
+  #maze-screen * {
+    visibility: visible;
+  }
+
+  #maze-screen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .maze-container {
+    padding: 0;
+  }
+
+  /* A4縦・1ページに収まるよう、SVGのviewBoxを保ったまま自動縮小する */
+  #maze-svg {
+    max-width: none;
+    width: 190mm;
+    height: 270mm;
+    border: none;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+}
+</style>
+</head>
+<body>
+
+<!-- ============================== 編集画面 ============================== -->
+<div id="editor-screen">
+  <header class="app-header">
+    <h1>計算迷路教材メーカー</h1>
+    <p class="app-subtitle">問題・正解・誤答・モンスター画像を入力して、計算迷路プリントを自動で作ろう</p>
+  </header>
+
+  <section class="toolbar">
+    <label class="toolbar-item toolbar-item-title">
+      プリントタイトル:
+      <input type="text" id="title-input" placeholder="例: けいさん めいろ プリント">
+    </label>
+
+    <label class="toolbar-item toolbar-item-title">
+      テーマ:
+      <input type="text" id="theme-input" placeholder="例: たし算・ひき算のれんしゅう">
+    </label>
+
+    <label class="toolbar-item">
+      迷路の大きさ:
+      <select id="difficulty-select">
+        <option value="small">小</option>
+        <option value="medium" selected>中</option>
+        <option value="large">大</option>
+      </select>
+    </label>
+
+    <label class="toolbar-item">
+      迷路の形:
+      <select id="maze-shape-select">
+        <option value="square" selected>四角形（従来）</option>
+        <option value="hex">六角形</option>
+      </select>
+    </label>
+
+    <button id="add-problem-btn" type="button" class="btn">＋ 問題を追加</button>
+    <button id="generate-btn" type="button" class="btn btn-primary">迷路作成</button>
+    <button id="save-json-btn" type="button" class="btn">JSON保存</button>
+    <label class="btn file-btn">
+      JSON読込
+      <input type="file" id="load-json-input" accept="application/json">
+    </label>
+  </section>
+
+  <section class="problem-table-wrap">
+    <p id="empty-notice" class="empty-notice" style="display:none;">
+      問題がありません。「＋ 問題を追加」から追加してください。
+    </p>
+    <table id="problem-table">
+      <thead>
+        <tr>
+          <th>問題</th>
+          <th>正解</th>
+          <th>誤答1</th>
+          <th>誤答2</th>
+          <th>モンスター画像</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="problem-list"></tbody>
+    </table>
+  </section>
+</div>
+
+<!-- ============================== 教材（迷路）画面 ============================== -->
+<div id="maze-screen" class="hidden">
+  <div class="maze-toolbar no-print">
+    <button id="back-to-edit-btn" type="button" class="btn">← 編集に戻る</button>
+    <button id="print-btn" type="button" class="btn btn-primary">🖨 印刷</button>
+    <button id="save-pdf-btn" type="button" class="btn">📄 PDFに保存</button>
+  </div>
+  <div id="maze-container" class="maze-container"></div>
+</div>
+
+<script>
+/**
+ * maze.js
+ * ---------------------------------------------------------------------------
+ * 迷路の基本データ構造（セル・グリッド）と、経路探索・問題配置候補の
+ * 探索など「迷路グラフ」に関する純粋なロジックを提供するモジュール。
+ * DOM には一切依存しないため、単体テストしやすい構造になっている。
+ * ---------------------------------------------------------------------------
+ */
+window.MK = window.MK || {};
+
+(function (MK) {
+  'use strict';
+
+  // 4方向の定義（dr/dc は行・列の増分、opposite は反対方向）
+  const SQUARE_DIRS = {
+    N: { dr: -1, dc: 0, opposite: 'S' },
+    S: { dr: 1, dc: 0, opposite: 'N' },
+    E: { dr: 0, dc: 1, opposite: 'W' },
+    W: { dr: 0, dc: -1, opposite: 'E' },
+  };
+
+  // 6方向（六角形・pointy-top配置）の定義。dr/dc は行・列（軸座標 r/q）の増分。
+  // 東西(E/W)は直接隣接し、残り4方向は斜め（NE/NW/SE/SW）に隣接する。
+  const HEX_DIRS = {
+    E:  { dr: 0,  dc: 1,  opposite: 'W'  },
+    W:  { dr: 0,  dc: -1, opposite: 'E'  },
+    NE: { dr: -1, dc: 1,  opposite: 'SW' },
+    SW: { dr: 1,  dc: -1, opposite: 'NE' },
+    NW: { dr: -1, dc: 0,  opposite: 'SE' },
+    SE: { dr: 1,  dc: 0,  opposite: 'NW' },
+  };
+
+  // 六角形を「オフセット座標」で配置する場合の、行の偶奇ごとの隣接オフセット。
+  // 軸座標そのままだと迷路全体が平行四辺形に傾いてしまい印刷に不向きなため、
+  // 実際の隣接判定（MazeGrid.neighbor）はこちらを使い、長方形に近い外形にする。
+  // 各方向の「反対方向」は行の偶奇によらず不変なので HEX_DIRS 側で管理する。
+  const HEX_OFFSET_DELTAS = {
+    even: { // row が偶数の行
+      E:  { dr: 0,  dc: 1  },
+      W:  { dr: 0,  dc: -1 },
+      NE: { dr: -1, dc: 0  },
+      NW: { dr: -1, dc: -1 },
+      SE: { dr: 1,  dc: 0  },
+      SW: { dr: 1,  dc: -1 },
+    },
+    odd: { // row が奇数の行
+      E:  { dr: 0,  dc: 1  },
+      W:  { dr: 0,  dc: -1 },
+      NE: { dr: -1, dc: 1  },
+      NW: { dr: -1, dc: 0  },
+      SE: { dr: 1,  dc: 1  },
+      SW: { dr: 1,  dc: 0  },
+    },
+  };
+
+  // 現在使用中の方向定義。MK.setMazeShape() で切り替える。
+  // 迷路生成・描画のあらゆる箇所は必ず MK.DIRS を経由して参照すること
+  // （モジュール内でローカル変数にキャッシュしてはいけない。切り替えが
+  // 反映されなくなるため）。
+  MK.SQUARE_DIRS = SQUARE_DIRS;
+  MK.HEX_DIRS = HEX_DIRS;
+  MK.HEX_OFFSET_DELTAS = HEX_OFFSET_DELTAS;
+  MK.DIRS = SQUARE_DIRS;
+  MK.mazeShape = 'square';
+  // 全域木を作る際に走査する「重複しない」方向の組。
+  // 逆方向ペア（例: E/W）から1つずつ選ぶことで、同じ辺を二重に数えない。
+  MK.SPANNING_DIRS = { square: ['E', 'S'], hex: ['E', 'NE', 'NW'] };
+
+  /**
+   * 迷路の形（'square'|'hex'）を切り替える。
+   * 以後の MazeGrid生成・迷路生成・描画はすべて MK.DIRS / MK.mazeShape を
+   * 参照するため、ここで切り替えるだけで全体の挙動が変わる。
+   */
+  MK.setMazeShape = function setMazeShape(shape) {
+    MK.mazeShape = shape === 'hex' ? 'hex' : 'square';
+    MK.DIRS = MK.mazeShape === 'hex' ? HEX_DIRS : SQUARE_DIRS;
+  };
+
+  /**
+   * 配列をシャッフルする（Fisher-Yates法）。破壊的変更は行わない。
+   * @param {Array} array
+   * @returns {Array} シャッフルされた新しい配列
+   */
+  function shuffleArray(array) {
+    const result = [...array];
+    for (let i = result.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [result[i], result[j]] = [result[j], result[i]];
+    }
+    return result;
+  }
+
+  /**
+   * 迷路の1マスを表すクラス。
+   * links には「通行可能な通路（辺）」を方向をキーとして保持する。
+   */
+  class Cell {
+    constructor(row, col) {
+      this.row = row;
+      this.col = col;
+      /** @type {Map<string, Cell>} 方向 -> 隣接セル（通行可能な辺のみ） */
+      this.links = new Map();
+      /** 役割: 'normal' | 'start' | 'goal' | 'problem' | 'monster' */
+      this.role = 'normal';
+      /** true の場合、ループ辺の追加対象から除外する（誤答枝など） */
+      this.reserved = false;
+    }
+
+    /** 双方向に通路をつなげる */
+    link(dir, otherCell) {
+      this.links.set(dir, otherCell);
+      otherCell.links.set(MK.DIRS[dir].opposite, this);
+    }
+
+    /** 指定したセルとの通路を切り離す（木の再接続で使用） */
+    unlinkTo(otherCell) {
+      let foundDir = null;
+      for (const [dir, linked] of this.links) {
+        if (linked === otherCell) {
+          foundDir = dir;
+          break;
+        }
+      }
+      if (foundDir) {
+        this.links.delete(foundDir);
+        otherCell.links.delete(MK.DIRS[foundDir].opposite);
+      }
+    }
+
+    hasLink(dir) {
+      return this.links.has(dir);
+    }
+
+    /** このセルが自由に使えるか（誤答枝や特殊マスに使われていないか） */
+    isFree() {
+      return !this.reserved && this.role === 'normal';
+    }
+  }
+
+  /**
+   * 迷路グリッド全体を管理するクラス。
+   */
+  class MazeGrid {
+    constructor(rows, cols) {
+      this.rows = rows;
+      this.cols = cols;
+      /** @type {Cell[][]} */
+      this.cells = [];
+      for (let r = 0; r < rows; r++) {
+        const rowCells = [];
+        for (let c = 0; c < cols; c++) {
+          rowCells.push(new Cell(r, c));
+        }
+        this.cells.push(rowCells);
+      }
+    }
+
+    /** 範囲内かどうかを確認しつつセルを取得する */
+    get(r, c) {
+      if (r < 0 || r >= this.rows || c < 0 || c >= this.cols) return null;
+      return this.cells[r][c];
+    }
+
+    /** 指定セルの、指定方向にある隣接セル（範囲外なら null） */
+    neighbor(cell, dir) {
+      if (MK.mazeShape === 'hex') {
+        // 六角形はオフセット座標（行の偶奇でずれる）で隣接を決める。
+        // こうすることで全体の外形が平行四辺形ではなく長方形に近くなる。
+        const parity = cell.row % 2 === 0 ? 'even' : 'odd';
+        const delta = MK.HEX_OFFSET_DELTAS[parity][dir];
+        if (!delta) return null;
+        return this.get(cell.row + delta.dr, cell.col + delta.dc);
+      }
+      const d = MK.DIRS[dir];
+      return this.get(cell.row + d.dr, cell.col + d.dc);
+    }
+
+    /** グリッド上の全セルを走査するイテレータ */
+    *allCells() {
+      for (const row of this.cells) {
+        for (const cell of row) yield cell;
+      }
+    }
+
+    /** セルの周囲（存在する方向のみ）を配列で返す */
+    neighborsOf(cell) {
+      const result = [];
+      for (const dir of Object.keys(MK.DIRS)) {
+        const n = this.neighbor(cell, dir);
+        if (n) result.push({ dir, cell: n });
+      }
+      return result;
+    }
+
+    /**
+     * 既に通行可能な辺（links）のみを使って start から goal への経路を
+     * 幅優先探索する。スタートからゴールへ必ず到達できることの検証、および
+     * 「本道（トランク）」を求めるために利用する。
+     * @returns {Cell[]|null} 経路（セル配列）。到達不可能なら null。
+     */
+    bfsPath(startCell, goalCell) {
+      const prev = new Map();
+      const visited = new Set([startCell]);
+      const queue = [startCell];
+      while (queue.length > 0) {
+        const current = queue.shift();
+        if (current === goalCell) break;
+        for (const [, next] of current.links) {
+          if (!visited.has(next)) {
+            visited.add(next);
+            prev.set(next, current);
+            queue.push(next);
+          }
+        }
+      }
+      if (!visited.has(goalCell)) return null;
+
+      const path = [goalCell];
+      let cur = goalCell;
+      while (cur !== startCell) {
+        cur = prev.get(cur);
+        path.push(cur);
+      }
+      path.reverse();
+      return path;
+    }
+
+    /** すべてのセルが到達可能かどうかを検証する（デバッグ・自己検証用） */
+    isFullyConnected() {
+      const all = [...this.allCells()];
+      if (all.length === 0) return true;
+      const start = all[0];
+      const visited = new Set([start]);
+      const queue = [start];
+      while (queue.length > 0) {
+        const cur = queue.shift();
+        for (const [, next] of cur.links) {
+          if (!visited.has(next)) {
+            visited.add(next);
+            queue.push(next);
+          }
+        }
+      }
+      return visited.size === all.length;
+    }
+  }
+
+  /**
+   * スタートからゴールまでの本道（トランクパス）を求める。
+   * 生成直後（ループ追加前）の全域木上では経路は一意になる。
+   */
+  function computeTrunkPath(grid, start, goal) {
+    return grid.bfsPath(start, goal);
+  }
+
+  /**
+   * 木構造を start を根としてたどり、各セルの「親」を記録したマップを作る。
+   * 全域木は必ず全セルを連結しているため、これで木構造全体が一意に定まる。
+   * @returns {Map<Cell, Cell|null>}
+   */
+  function buildParentMap(grid, start) {
+    const parent = new Map([[start, null]]);
+    const queue = [start];
+    while (queue.length > 0) {
+      const cur = queue.shift();
+      for (const [, next] of cur.links) {
+        if (!parent.has(next)) {
+          parent.set(next, cur);
+          queue.push(next);
+        }
+      }
+    }
+    return parent;
+  }
+
+  /** parentMap上で maybeAncestor が cell の祖先（または本人）かどうかを調べる */
+  function isAncestorOrSelf(parentMap, maybeAncestor, cell) {
+    let cur = cell;
+    while (cur !== null && cur !== undefined) {
+      if (cur === maybeAncestor) return true;
+      cur = parentMap.get(cur);
+    }
+    return false;
+  }
+
+  /**
+   * 問題セル X から、指定方向 dir にある隣接セル Y を「誤答枝の入口」として
+   * 確保する。
+   *  - 既に X-Y 間に通路（木の辺）が自然に存在する場合はそれをそのまま使う。
+   *  - 存在しない場合は、Y が現在つながっている木の枝を安全に「付け替え」て
+   *    X から新しく生やす（木のグラフ構造を保ったまま、Y以下の部分木を
+   *    Xの子として再接続する＝クラスタ法迷路ならではの安全な再構成）。
+   *    ただし X と Y が祖先・子孫の関係にある場合は閉路や分断が起きるため
+   *    付け替えを行わない（null を返す＝この方向は使用不可）。
+   *
+   * @param {Set<Cell>} [forbiddenSet] 付け替え先として絶対に選んではいけないセルの集合
+   * @returns {Cell|null} 誤答枝の入口となる隣接セル（失敗時は null）
+   */
+  function attachBranch(grid, problemCell, dir, start, forbiddenSet) {
+    const Y = grid.neighbor(problemCell, dir);
+    if (!Y) return null;
+    if (Y.reserved || Y.role !== 'normal') return null;
+
+    if (problemCell.hasLink(dir)) {
+      // 既存の自然な枝（Case 1）：そのまま利用できる（木を変更しないため常に安全）
+      return Y;
+    }
+
+    // これから木を変更する（付け替える）操作なので、本道のセルは対象外にする
+    if (forbiddenSet && forbiddenSet.has(Y)) return null;
+
+    // グリッドの現在の状態から祖先関係を作り直して確認する
+    const parentMap = buildParentMap(grid, start);
+
+    // 祖先・子孫関係にある場合は付け替えが安全でないためスキップ
+    if (isAncestorOrSelf(parentMap, Y, problemCell)) return null;
+    if (isAncestorOrSelf(parentMap, problemCell, Y)) return null;
+
+    const parentY = parentMap.get(Y);
+    if (parentY === null || parentY === undefined) return null; // Yが根(start)などの異常系
+
+    // 木の再接続: Yをこれまでの親から切り離し、問題セルの子として繋ぎ直す
+    parentY.unlinkTo(Y);
+    problemCell.link(dir, Y);
+    return Y;
+  }
+
+  /** 行き止まりの通路を伸ばす際の最大延長ステップ数 */
+  const EXTEND_MAX_STEPS = 14;
+
+  /** モンスターと問題セルの間に最低限必要な距離（マス数の2乗）。これ未満にしかならない見込みの方向は諦める */
+  const MIN_MONSTER_DIST_SQ = 4; // 距離2マス相当
+
+  /**
+   * 誤答枝の行き止まり（leafCell）から、まだ他の用途に使われていない
+   * 隣接セルへ向けて、通路をできるだけ遠くまで安全に延長する。
+   *
+   * @param {MazeGrid} grid
+   * @param {Cell} leafCell 現在の行き止まりセル
+   * @param {Set<Cell>} subtreeSet この枝に既に含まれているセルの集合（延長分もここに追加される）
+   * @param {Cell} start
+   * @param {number} maxSteps 延長を試みる最大回数
+   * @param {Set<Cell>} trunkSet 本道（トランクパス）のセル集合。
+   * @param {Cell} origin 問題セル。この座標からできるだけ離れる方向へ延長する。
+   * @returns {Cell} 延長後の新しい行き止まりセル（モンスターの配置場所）
+   */
+  function extendDeadEnd(grid, leafCell, subtreeSet, start, maxSteps, trunkSet, origin) {
+    let current = leafCell;
+    for (let step = 0; step < maxSteps; step++) {
+      const candidates = shuffleArray(Object.keys(MK.DIRS))
+        .map((dir) => {
+          const candidate = grid.neighbor(current, dir);
+          if (!candidate) return null;
+          const dr = candidate.row - origin.row;
+          const dc = candidate.col - origin.col;
+          return { dir, candidate, distSq: dr * dr + dc * dc };
+        })
+        .filter(Boolean)
+        .sort((a, b) => b.distSq - a.distSq);
+
+      let extended = false;
+      for (const { dir, candidate } of candidates) {
+        if (subtreeSet.has(candidate)) continue;
+        const attached = attachBranch(grid, current, dir, start, trunkSet);
+        if (attached === candidate) {
+          subtreeSet.add(candidate);
+          current = candidate;
+          extended = true;
+          break;
+        }
+      }
+      if (!extended) break; // これ以上安全に伸ばせる方向がない
+    }
+    return current;
+  }
+
+  /**
+   * グリッドを一切変更せずに、startCell から maxSteps 歩以内で
+   * origin からどれだけ離れられそうかを見積もる（上限の概算値）。
+   *
+   * @returns {number} 到達しうる origin からの距離の2乗の最大値
+   */
+  function estimateMaxReachableDistSq(grid, startCell, origin, trunkSet, subtreeSet, maxSteps) {
+    const startDr = startCell.row - origin.row;
+    const startDc = startCell.col - origin.col;
+    let bestDistSq = startDr * startDr + startDc * startDc;
+
+    const visited = new Set([startCell]);
+    let frontier = [{ cell: startCell, steps: 0 }];
+
+    while (frontier.length > 0) {
+      const next = [];
+      for (const { cell, steps } of frontier) {
+        if (steps >= maxSteps) continue;
+        for (const dir of Object.keys(MK.DIRS)) {
+          const n = grid.neighbor(cell, dir);
+          if (!n || visited.has(n)) continue;
+          if (subtreeSet.has(n) || trunkSet.has(n)) continue;
+          if (!n.isFree()) continue;
+          visited.add(n);
+          const dr = n.row - origin.row;
+          const dc = n.col - origin.col;
+          const distSq = dr * dr + dc * dc;
+          if (distSq > bestDistSq) bestDistSq = distSq;
+          next.push({ cell: n, steps: steps + 1 });
+        }
+      }
+      frontier = next;
+    }
+    return bestDistSq;
+  }
+
+  /**
+   * 指定した個数の要素を、配列上でできるだけ均等な間隔になるよう選ぶ。
+   * @param {Array} items index順にソート済みであることを期待しない（内部でソートする）
+   * @param {number} count
+   * @param {(item)=>number} indexOf 各要素の並び順を表す数値を取り出す関数
+   */
+  function pickSpaced(items, count, indexOf) {
+    const sorted = [...items].sort((a, b) => indexOf(a) - indexOf(b));
+    if (sorted.length <= count) return sorted;
+    const usedIdx = new Set();
+    const picked = [];
+    for (let i = 0; i < count; i++) {
+      let idx = Math.round((i + 0.5) * (sorted.length / count));
+      idx = Math.max(0, Math.min(sorted.length - 1, idx));
+      while (usedIdx.has(idx)) {
+        idx = (idx + 1) % sorted.length;
+      }
+      usedIdx.add(idx);
+      picked.push(sorted[idx]);
+    }
+    picked.sort((a, b) => indexOf(a) - indexOf(b));
+    return picked;
+  }
+
+  /**
+   * トランクパス上に問題ボックスの配置場所を計画する。
+   * 各配置場所は「正解方向（トランクの続き）」と「誤答方向2つ」を持つ。
+   *
+   * @param {MazeGrid} grid
+   * @param {Cell} start
+   * @param {Cell} goal
+   * @param {number} problemCount
+   * @returns {{trunkPath:Cell[], placements:Array<{cell:Cell,index:number,correctDir:string,branches:Array<{dir:string,child:Cell}>}>}|null}
+   */
+  function planProblemPlacements(grid, start, goal, problemCount) {
+    const trunkPath = computeTrunkPath(grid, start, goal);
+    if (!trunkPath) return null;
+    if (problemCount === 0) return { trunkPath, placements: [] };
+
+    // 内部セル（グリッドの外周に接していない）だけを候補にする。
+    const interior = [];
+    for (let i = 1; i < trunkPath.length - 1; i++) {
+      const cell = trunkPath[i];
+      if (cell.row === 0 || cell.row === grid.rows - 1) continue;
+      if (cell.col === 0 || cell.col === grid.cols - 1) continue;
+      interior.push({ cell, index: i });
+    }
+    if (interior.length < problemCount) return null;
+
+    // 本道（トランクパス）のセル集合。
+    const trunkSet = new Set(trunkPath);
+
+    /**
+     * 1件の候補セルに対して、正解方向＋誤答2方向の確保を試みる。
+     * 失敗した場合は null を返す（グリッドの状態は変更しない）。
+     */
+    const tryPlaceAt = (cell, index) => {
+      const prevCell = trunkPath[index - 1];
+      const nextCell = trunkPath[index + 1];
+
+      let correctDir = null;
+      let incomingDir = null;
+      const usedDirs = new Set();
+      for (const [dir, linked] of cell.links) {
+        if (linked === prevCell || linked === nextCell) usedDirs.add(dir);
+        if (linked === nextCell) correctDir = dir;
+        if (linked === prevCell) incomingDir = dir;
+      }
+      const leftoverDirs = Object.keys(MK.DIRS).filter((d) => !usedDirs.has(d));
+      if (leftoverDirs.length < 2 || !correctDir) return null;
+
+      cell.role = 'problem';
+
+      const branches = [];
+      const reservedSoFar = []; // 失敗時に元に戻すための記録
+      // 四角形では余り方向は必ずちょうど2つなので影響しないが、六角形では
+      // 4つの候補から2つを選ぶことになるため、シャッフルしてから選ぶことで
+      // 特定の2方向だけに固定されて配置失敗しやすくなるのを防ぐ。
+      for (const dir of shuffleArray(leftoverDirs).slice(0, 2)) {
+        const child = attachBranch(grid, cell, dir, start, trunkSet);
+        if (!child) {
+          reservedSoFar.forEach((c) => {
+            c.reserved = false;
+            if (c.role === 'monster') c.role = 'normal';
+          });
+          cell.role = 'normal'; // ロールバック
+          return null;
+        }
+
+        const { cells: subtreeCells, leaf } = collectSubtree(child, cell);
+        const subtreeSet = new Set(subtreeCells);
+
+        let extendStart = leaf;
+        let bestDistSq = -1;
+        for (const c of subtreeCells) {
+          const dr = c.row - cell.row;
+          const dc = c.col - cell.col;
+          const distSq = dr * dr + dc * dc;
+          if (distSq > bestDistSq) {
+            bestDistSq = distSq;
+            extendStart = c;
+          }
+        }
+
+        const maxExtend = Math.min(
+          EXTEND_MAX_STEPS,
+          Math.max(2, Math.floor(Math.min(grid.rows, grid.cols) / 2))
+        );
+
+        const reachableDistSq = estimateMaxReachableDistSq(
+          grid,
+          extendStart,
+          cell,
+          trunkSet,
+          subtreeSet,
+          maxExtend
+        );
+        if (reachableDistSq < MIN_MONSTER_DIST_SQ) {
+          reservedSoFar.forEach((c) => {
+            c.reserved = false;
+            if (c.role === 'monster') c.role = 'normal';
+          });
+          cell.role = 'normal';
+          return null;
+        }
+
+        const extendedLeaf = extendDeadEnd(grid, extendStart, subtreeSet, start, maxExtend, trunkSet, cell);
+        const finalCells = [...subtreeSet];
+
+        finalCells.forEach((c) => {
+          c.reserved = true;
+          reservedSoFar.push(c);
+        });
+        extendedLeaf.role = 'monster';
+
+        branches.push({ dir, child, subtreeCells: finalCells, monsterCell: extendedLeaf });
+      }
+
+      return { cell, index, correctDir, incomingDir, branches };
+    };
+
+    const MIN_TRUNK_GAP = 5;
+    const MIN_GRID_DIST = 5;
+    // スタート・ゴールの丸マーカーも大きく描画されるため、問題ボックスが
+    // すぐ近くに配置されると重なってしまうことがある。これを防ぐため、
+    // スタート・ゴールからも一定のグリッド距離を確保する。
+    const MIN_ENDPOINT_GRID_DIST = 4;
+    const orderedCandidates = orderBySpacingPriority(interior, problemCount);
+    const placements = [];
+    const usedCells = new Set();
+    const placedIndices = [];
+    const placedCells = [];
+    for (const { cell, index } of orderedCandidates) {
+      if (placements.length >= problemCount) break;
+      if (usedCells.has(cell)) continue;
+      if (placedIndices.some((pi) => Math.abs(pi - index) < MIN_TRUNK_GAP)) continue;
+      if (
+        placedCells.some(
+          (pc) => Math.abs(pc.row - cell.row) + Math.abs(pc.col - cell.col) < MIN_GRID_DIST
+        )
+      ) {
+        continue;
+      }
+      if (
+        Math.abs(cell.row - start.row) + Math.abs(cell.col - start.col) < MIN_ENDPOINT_GRID_DIST ||
+        Math.abs(cell.row - goal.row) + Math.abs(cell.col - goal.col) < MIN_ENDPOINT_GRID_DIST
+      ) {
+        continue;
+      }
+      const placed = tryPlaceAt(cell, index);
+      if (placed) {
+        placements.push(placed);
+        usedCells.add(cell);
+        placedIndices.push(index);
+        placedCells.push(cell);
+      }
+    }
+
+    if (placements.length < problemCount) return null;
+    placements.sort((a, b) => a.index - b.index);
+    return { trunkPath, placements };
+  }
+
+  /**
+   * 候補配列を「均等配置に適した順」に並べ替える。
+   */
+  function orderBySpacingPriority(interior, problemCount) {
+    const sorted = [...interior].sort((a, b) => a.index - b.index);
+    if (sorted.length <= problemCount) return sorted;
+
+    const idealPicks = pickSpaced(sorted, problemCount, (item) => item.index);
+    const idealSet = new Set(idealPicks);
+    const rest = sorted.filter((item) => !idealSet.has(item));
+    return [...idealPicks, ...rest];
+  }
+
+  /**
+   * あるセルを起点（親をavoidCellとして除外）に、木構造上の部分木
+   * （そこから先につながる枝）をすべて収集する。
+   *
+   * @param {Cell} startCell 部分木の根（誤答ルートの入口）
+   * @param {Cell} avoidCell 戻り方向（親）のセル
+   * @returns {{cells: Cell[], leaf: Cell}} 収集したセルと、モンスターを置く行き止まりセル
+   */
+  function collectSubtree(startCell, avoidCell) {
+    const parent = new Map([[startCell, avoidCell]]);
+    const depth = new Map([[startCell, 1]]);
+    const kept = [startCell];
+    const queue = [startCell];
+
+    while (queue.length > 0) {
+      const cur = queue.shift();
+      const d = depth.get(cur);
+      for (const [, linked] of cur.links) {
+        if (linked === parent.get(cur)) continue;
+        if (depth.has(linked)) continue;
+        parent.set(linked, cur);
+        depth.set(linked, d + 1);
+        kept.push(linked);
+        queue.push(linked);
+      }
+    }
+
+    let leaf = startCell;
+    let deepestDepth = 1;
+    for (const cell of kept) {
+      const d = depth.get(cell);
+      if (d > deepestDepth) {
+        deepestDepth = d;
+        leaf = cell;
+      }
+    }
+
+    return { cells: kept, leaf };
+  }
+
+  /**
+   * グリッド上の全セルに「セグメント番号」を割り当てる。
+   *
+   * @param {MazeGrid} grid
+   * @param {Cell} start
+   * @param {Cell[]} trunkPath
+   * @param {Array<{index:number}>} placements
+   * @returns {Map<Cell, number>} セル -> 区間番号（0始まり）
+   */
+  function computeSegments(grid, start, trunkPath, placements) {
+    const problemIndices = placements.map((p) => p.index).sort((a, b) => a - b);
+    const segmentForTrunkIndex = (idx) => {
+      let count = 0;
+      for (const pi of problemIndices) {
+        if (pi < idx) count++;
+      }
+      return count;
+    };
+
+    const segmentMap = new Map();
+    trunkPath.forEach((cell, idx) => segmentMap.set(cell, segmentForTrunkIndex(idx)));
+
+    const parentMap = buildParentMap(grid, start);
+
+    for (const cell of grid.allCells()) {
+      if (segmentMap.has(cell)) continue;
+      const path = [];
+      let cur = cell;
+      while (cur !== null && cur !== undefined && !segmentMap.has(cur)) {
+        path.push(cur);
+        cur = parentMap.get(cur);
+      }
+      const resolved = cur !== null && cur !== undefined ? segmentMap.get(cur) : 0;
+      for (const c of path) segmentMap.set(c, resolved);
+    }
+
+    return segmentMap;
+  }
+
+  // ---- 公開API（window.MK 名前空間にのみ公開する） ----
+  MK.shuffleArray = shuffleArray;
+  MK.Cell = Cell;
+  MK.MazeGrid = MazeGrid;
+  MK.computeTrunkPath = computeTrunkPath;
+  MK.buildParentMap = buildParentMap;
+  MK.planProblemPlacements = planProblemPlacements;
+  MK.collectSubtree = collectSubtree;
+  MK.computeSegments = computeSegments;
+})(window.MK);
+</script>
+<script>
+/**
+ * clusterMaze.js
+ * ---------------------------------------------------------------------------
+ * 「クラスタ法（Union-Find）」による迷路生成を行うモジュール。
+ * ---------------------------------------------------------------------------
+ */
+window.MK = window.MK || {};
+
+(function (MK) {
+  'use strict';
+
+  const shuffleArray = MK.shuffleArray;
+
+/**
+ * Union-Find（素集合データ構造）。クラスタ法の中核となるデータ構造。
+ */
+class UnionFind {
+  constructor(items) {
+    this.parent = new Map();
+    for (const item of items) this.parent.set(item, item);
+  }
+
+  find(item) {
+    let root = item;
+    while (this.parent.get(root) !== root) root = this.parent.get(root);
+    // 経路圧縮
+    let cur = item;
+    while (this.parent.get(cur) !== root) {
+      const next = this.parent.get(cur);
+      this.parent.set(cur, root);
+      cur = next;
+    }
+    return root;
+  }
+
+  /** 2つの要素を併合する。既に同じ集合なら false を返す（＝閉路になる） */
+  union(a, b) {
+    const ra = this.find(a);
+    const rb = this.find(b);
+    if (ra === rb) return false;
+    this.parent.set(ra, rb);
+    return true;
+  }
+}
+
+class ClusterMazeGenerator {
+  /** @param {import('./maze.js').MazeGrid} grid */
+  constructor(grid) {
+    this.grid = grid;
+  }
+
+  /**
+   * ランダム化Kruskal法（Union-Find）で全域木を生成する。
+   */
+  generateSpanningTree() {
+    const grid = this.grid;
+    const allCells = [...grid.allCells()];
+    const uf = new UnionFind(allCells);
+
+    // 各セルから重複しない方向（逆方向ペアごとに1つ）だけを辿って辺を
+    // 列挙する。四角形なら E/S の2方向、六角形なら E/NE/NW の3方向。
+    const spanDirs = MK.SPANNING_DIRS[MK.mazeShape] || MK.SPANNING_DIRS.square;
+    const edges = [];
+    for (const cell of allCells) {
+      for (const dir of spanDirs) {
+        const n = grid.neighbor(cell, dir);
+        if (n) edges.push({ a: cell, b: n, dir });
+      }
+    }
+
+    const shuffled = shuffleArray(edges);
+    for (const edge of shuffled) {
+      if (uf.union(edge.a, edge.b)) {
+        edge.a.link(edge.dir, edge.b);
+      }
+    }
+  }
+
+  /**
+   * ループを作るための追加辺をランダムに carve する。
+   *
+   * @param {number} density 開通させる辺の割合（0〜1）。1に近いほど壁が少なくなる。
+   * @param {Map<Cell, number>} [segmentMap] セル→区間番号のマップ（省略可）。
+   * @returns {number} 実際に追加できた辺の数
+   */
+  addLoopEdges(density, segmentMap) {
+    const grid = this.grid;
+    const candidates = [];
+    for (const cell of grid.allCells()) {
+      if (!cell.isFree()) continue;
+      for (const { dir, cell: n } of grid.neighborsOf(cell)) {
+        if (!n.isFree()) continue;
+        if (cell.hasLink(dir)) continue;
+        if (segmentMap && segmentMap.get(cell) !== segmentMap.get(n)) continue;
+        candidates.push({ a: cell, b: n, dir });
+      }
+    }
+
+    const clampedDensity = Math.max(0, Math.min(1, density));
+    const count = Math.round(candidates.length * clampedDensity);
+
+    const shuffled = shuffleArray(candidates);
+    const usedPairs = new Set();
+    let added = 0;
+    for (const cand of shuffled) {
+      if (added >= count) break;
+      const keyA = `${cand.a.row},${cand.a.col}-${cand.b.row},${cand.b.col}`;
+      const keyB = `${cand.b.row},${cand.b.col}-${cand.a.row},${cand.a.col}`;
+      if (usedPairs.has(keyA) || usedPairs.has(keyB)) continue;
+      if (cand.a.hasLink(cand.dir)) continue;
+      cand.a.link(cand.dir, cand.b);
+      usedPairs.add(keyA);
+      added++;
+    }
+    return added;
+  }
+}
+
+  // ---- 公開API ----
+  MK.ClusterMazeGenerator = ClusterMazeGenerator;
+})(window.MK);
+</script>
+<script>
+/**
+ * monster.js
+ * ---------------------------------------------------------------------------
+ * モンスター（誤答ルートの行き止まりに置く画像）を管理するモジュール。
+ * ---------------------------------------------------------------------------
+ */
+window.MK = window.MK || {};
+
+(function (MK) {
+  'use strict';
+
+  /** 画像が指定されなかった場合に使う、簡単なモンスターのイラスト（SVG） */
+  const DEFAULT_MONSTER_SVG = `
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <circle cx="50" cy="55" r="38" fill="#8a5cf5" />
+  <circle cx="36" cy="48" r="8" fill="#fff" />
+  <circle cx="64" cy="48" r="8" fill="#fff" />
+  <circle cx="36" cy="48" r="3.5" fill="#333" />
+  <circle cx="64" cy="48" r="3.5" fill="#333" />
+  <path d="M35 70 Q50 82 65 70" stroke="#333" stroke-width="3" fill="none" stroke-linecap="round" />
+  <path d="M18 60 L8 45 M82 60 L92 45 M25 30 L18 15 M75 30 L82 15" stroke="#8a5cf5" stroke-width="6" fill="none" stroke-linecap="round" />
+</svg>`.trim();
+
+  const DEFAULT_MONSTER_HREF = `data:image/svg+xml;utf8,${encodeURIComponent(DEFAULT_MONSTER_SVG)}`;
+
+  /**
+   * 1体のモンスターを表すクラス。
+   */
+  class Monster {
+    /**
+     * @param {string} id モンスターの識別子
+     * @param {string|null} imageDataUrl 画像のデータURL（未指定ならnull）
+     */
+    constructor(id, imageDataUrl) {
+      this.id = id;
+      this.imageDataUrl = imageDataUrl || null;
+    }
+
+    /** SVGの<image>要素に渡すためのhref文字列を返す */
+    getHref() {
+      return this.imageDataUrl || DEFAULT_MONSTER_HREF;
+    }
+  }
+
+  /**
+   * モンスターの生成・管理を行うクラス。
+   */
+  class MonsterManager {
+    constructor() {
+      /** @type {Map<string, Monster>} */
+      this.monsters = new Map();
+    }
+
+    /**
+     * モンスターを新規作成して登録する。
+     * @param {string} id
+     * @param {string|null} imageDataUrl
+     * @returns {Monster}
+     */
+    create(id, imageDataUrl) {
+      const monster = new Monster(id, imageDataUrl);
+      this.monsters.set(id, monster);
+      return monster;
+    }
+
+    get(id) {
+      return this.monsters.get(id);
+    }
+
+    clear() {
+      this.monsters.clear();
+    }
+  }
+
+  // ---- 公開API ----
+  MK.Monster = Monster;
+  MK.MonsterManager = MonsterManager;
+})(window.MK);
+</script>
+<script>
+/**
+ * save.js
+ * ---------------------------------------------------------------------------
+ * 教材データ（問題リスト・難易度など）をJSON形式で保存・読み込みするための
+ * ユーティリティクラス。
+ * ---------------------------------------------------------------------------
+ */
+window.MK = window.MK || {};
+
+(function (MK) {
+  'use strict';
+
+  class SaveManager {
+    /**
+     * データをJSONファイルとしてダウンロードする。
+     * @param {Object} data 保存するデータ
+     * @param {string} [filename]
+     */
+    static exportJSON(data, filename = 'maze-kyozai.json') {
+      const json = JSON.stringify(data, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
+
+    /**
+     * <input type="file"> から選択されたJSONファイルを読み込む。
+     * @param {File} file
+     * @returns {Promise<Object>}
+     */
+    static importJSON(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            const data = JSON.parse(reader.result);
+            resolve(data);
+          } catch (err) {
+            reject(err);
+          }
+        };
+        reader.onerror = () => reject(reader.error || new Error('ファイルの読み込みに失敗しました'));
+        reader.readAsText(file);
+      });
+    }
+  }
+
+  // ---- 公開API ----
+  MK.SaveManager = SaveManager;
+})(window.MK);
+</script>
+<script>
+/**
+ * renderer.js
+ * ---------------------------------------------------------------------------
+ * 迷路データ（MazeGridと配置情報）をSVGとして描画するクラス。
+ * 通路は壁を描くことで表現し（つながっている方向には何も描かない）、
+ * 問題ボックス・モンスター・スタート/ゴールの表示を担当する。
+ * ---------------------------------------------------------------------------
+ */
+window.MK = window.MK || {};
+
+(function (MK) {
+  'use strict';
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const XLINK_NS = 'http://www.w3.org/1999/xlink';
+
+// pointy-top六角形の角の向き（-90°を上として60°刻み）
+const HEX_CORNER_ANGLES = [-90, -30, 30, 90, 150, 210];
+// 各方向 -> その方向の隣接セルと共有する辺の、両端の角のインデックス
+const HEX_EDGE_CORNERS = { E: [1, 2], SE: [2, 3], SW: [3, 4], W: [4, 5], NW: [5, 0], NE: [0, 1] };
+
+class MazeRenderer {
+  /**
+   * @param {HTMLElement} container 描画先のDOM要素
+   * @param {Object} [options]
+   */
+  constructor(container, options = {}) {
+    this.container = container;
+    this.cellSize = options.cellSize || 84;
+    // 六角形モードでの外接円半径。sqrt(3)*hexR がおおよそ cellSize と
+    // 同じ間隔になるよう係数を決めている（四角形版と見た目の密度を揃える）。
+    this.hexR = this.cellSize * 0.62;
+    this.pos = null; // render() 実行時にセル座標変換関数を保持する
+  }
+
+  /**
+   * 迷路全体を描画する。
+   * @param {import('./maze.js').MazeGrid} grid
+   * @param {Object} layout
+   * @param {Cell} layout.start
+   * @param {Cell} layout.goal
+   * @param {Array} layout.problems  [{cell, questionText, options:[{dir,text,isCorrect}]}]
+   * @param {Array} layout.monsters  [{cell, monster}]
+   * @param {Object} [renderOptions]
+   * @param {string} [renderOptions.title] プリント上部に表示するタイトル（空なら非表示）
+   * @param {string} [renderOptions.theme] プリント上部に表示するテーマ（空なら非表示）
+   */
+  render(grid, layout, renderOptions = {}) {
+    const title = (renderOptions.title || '').trim();
+    const theme = (renderOptions.theme || '').trim();
+    // 迷路の形。'hex' なら六角形セル、それ以外は従来の四角形セルで描画する。
+    this.shape = renderOptions.shape === 'hex' ? 'hex' : 'square';
+
+    const pad = this.cellSize * 0.7;
+    let mazeWidth, mazeHeight, toX, toY;
+
+    if (this.shape === 'hex') {
+      // pointy-top六角形を「オフセット座標」で配置する（奇数行だけ半セル右へ
+      // ずらす）。軸座標そのままの連続的なずらし方だと迷路全体が平行四辺形に
+      // 傾いてしまい印刷に不向きだったため、行の偶奇でずらす方式にして
+      // 全体の外形を長方形に近づけている（グリッド側の隣接判定 = MazeGrid.
+      // neighbor もこれに合わせてある）。
+      const hexR = this.hexR;
+      const colStep = hexR * Math.sqrt(3);
+      const rowStep = hexR * 1.5;
+      mazeWidth = colStep * (grid.cols + 0.5) + pad * 2;
+      mazeHeight = rowStep * Math.max(grid.rows - 1, 0) + hexR * 2 + pad * 2;
+      toX = (row, col) => pad + colStep / 2 + colStep * col + (row % 2 === 1 ? colStep / 2 : 0);
+      toY = (row) => pad + hexR + rowStep * row; // headerHeight は後で加算する
+    } else {
+      mazeWidth = grid.cols * this.cellSize + pad * 2;
+      mazeHeight = grid.rows * this.cellSize + pad * 2;
+      toX = (row, col) => pad + col * this.cellSize + this.cellSize / 2;
+      toY = (row) => pad + row * this.cellSize + this.cellSize / 2; // headerHeight は後で加算する
+    }
+
+    // 学習者が自分のプリントだとわかるよう、名前を書く欄は常に確保する。
+    const nameHeight = this.cellSize * 0.72;
+    // タイトル・テーマを入力した場合は、それぞれの分だけ上部にスペースを確保する。
+    const titleHeight = title ? this.cellSize * 1.45 : 0;
+    const themeHeight = theme ? this.cellSize * 0.68 : 0;
+    const headerHeight = nameHeight + titleHeight + themeHeight;
+
+    const width = mazeWidth;
+    const height = headerHeight + mazeHeight;
+
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    svg.setAttribute('width', '100%');
+    svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+    svg.id = 'maze-svg';
+
+    this.pos = { toX: (r, c) => toX(r, c), toY: (r, c) => toY(r, c) + headerHeight };
+
+    // 背景
+    const bg = document.createElementNS(SVG_NS, 'rect');
+    bg.setAttribute('x', 0);
+    bg.setAttribute('y', 0);
+    bg.setAttribute('width', width);
+    bg.setAttribute('height', height);
+    bg.setAttribute('class', 'maze-bg');
+    svg.appendChild(bg);
+
+    this._drawHeader(svg, { title, theme }, width, nameHeight, titleHeight, themeHeight);
+
+    this._drawCorridors(svg, grid);
+    this._drawMarker(svg, layout.start, 'スタート', 'start-marker');
+    this._drawMarker(svg, layout.goal, 'ゴール', 'goal-marker');
+    (layout.monsters || []).forEach((m) => this._drawMonster(svg, m));
+    (layout.problems || []).forEach((p) => this._drawProblemBox(svg, p));
+
+    this.container.innerHTML = '';
+    this.container.appendChild(svg);
+    return svg;
+  }
+
+  /**
+   * プリント上部の見出し部分をまとめて描画する。
+   *  - 名前欄（「なまえ：＿＿＿＿」）は、誰のプリントかわかるように常に表示する。
+   *  - タイトル・テーマは入力されている場合のみ、名前欄の下に中央揃えで表示する。
+   */
+  _drawHeader(svg, { title, theme }, width, nameHeight, titleHeight, themeHeight) {
+    const lineEnd = width - this.cellSize * 0.35;
+    const lineWidth = Math.min(width * 0.56, this.cellSize * 6.2);
+    const lineStart = lineEnd - lineWidth;
+    const lineY = nameHeight * 0.68;
+
+    const label = document.createElementNS(SVG_NS, 'text');
+    label.setAttribute('x', (lineStart - this.cellSize * 0.12).toFixed(2));
+    label.setAttribute('y', (nameHeight * 0.64).toFixed(2));
+    label.setAttribute('text-anchor', 'end');
+    label.setAttribute('class', 'print-name-label');
+    label.textContent = 'なまえ：';
+    svg.appendChild(label);
+
+    this._line(svg, lineStart, lineY, lineEnd, lineY, 'print-name-line');
+
+    let y = nameHeight;
+
+    if (title) {
+      const titleText = document.createElementNS(SVG_NS, 'text');
+      titleText.setAttribute('x', width / 2);
+      titleText.setAttribute('y', (y + titleHeight / 2 + this.cellSize * 0.15).toFixed(2));
+      titleText.setAttribute('text-anchor', 'middle');
+      titleText.setAttribute('class', 'print-title-text');
+      titleText.textContent = title;
+      svg.appendChild(titleText);
+      y += titleHeight;
+    }
+
+    if (theme) {
+      const themeText = document.createElementNS(SVG_NS, 'text');
+      themeText.setAttribute('x', width / 2);
+      themeText.setAttribute('y', (y + themeHeight / 2 + this.cellSize * 0.1).toFixed(2));
+      themeText.setAttribute('text-anchor', 'middle');
+      themeText.setAttribute('class', 'print-theme-text');
+      themeText.textContent = theme;
+      svg.appendChild(themeText);
+      y += themeHeight;
+    }
+  }
+
+  _line(parent, x1, y1, x2, y2, cls) {
+    const line = document.createElementNS(SVG_NS, 'line');
+    line.setAttribute('x1', x1.toFixed(2));
+    line.setAttribute('y1', y1.toFixed(2));
+    line.setAttribute('x2', x2.toFixed(2));
+    line.setAttribute('y2', y2.toFixed(2));
+    line.setAttribute('class', cls);
+    parent.appendChild(line);
+    return line;
+  }
+
+  /**
+   * すべての通路を「壁（通れない側）」を描くことで表現する。
+   * 「つながっていない方向にだけ壁の線を引く」方式。
+   */
+  _drawCorridors(svg, grid) {
+    const group = document.createElementNS(SVG_NS, 'g');
+    group.setAttribute('class', 'corridors');
+    const drawnWalls = new Set();
+    const half = this.cellSize / 2;
+
+    for (const cell of grid.allCells()) {
+      for (const dir of Object.keys(MK.DIRS)) {
+        if (cell.hasLink(dir)) continue; // 通行可能な方向には壁を描かない
+
+        const other = grid.neighbor(cell, dir);
+        const key = other ? this._wallKey(cell, other) : this._borderWallKey(cell, dir);
+        if (drawnWalls.has(key)) continue;
+        drawnWalls.add(key);
+
+        this._drawWallSegment(group, cell, dir, half);
+      }
+    }
+    svg.appendChild(group);
+  }
+
+  /** グリッド内部の壁（隣接マスと共有する壁）の重複描画を防ぐためのキー */
+  _wallKey(a, b) {
+    const ka = `${a.row},${a.col}`;
+    const kb = `${b.row},${b.col}`;
+    return ka < kb ? `${ka}|${kb}` : `${kb}|${ka}`;
+  }
+
+  /** グリッド外周の壁（隣接マスが存在しない側）のキー */
+  _borderWallKey(cell, dir) {
+    return `border:${cell.row},${cell.col},${dir}`;
+  }
+
+  /** 六角形セルの6つの角（中心からの相対座標）を返す */
+  _hexCorners(cx, cy) {
+    const r = this.hexR;
+    return HEX_CORNER_ANGLES.map((deg) => {
+      const rad = (Math.PI / 180) * deg;
+      return [cx + r * Math.cos(rad), cy + r * Math.sin(rad)];
+    });
+  }
+
+  /** 1マスの、指定した方向の辺（壁）を1本の線として描画する */
+  _drawWallSegment(group, cell, dir, half) {
+    const { toX, toY } = this.pos;
+    const cx = toX(cell.row, cell.col);
+    const cy = toY(cell.row, cell.col);
+
+    if (this.shape === 'hex') {
+      const corners = this._hexCorners(cx, cy);
+      const [ia, ib] = HEX_EDGE_CORNERS[dir] || HEX_EDGE_CORNERS.E;
+      const [x1, y1] = corners[ia];
+      const [x2, y2] = corners[ib];
+      this._line(group, x1, y1, x2, y2, 'road-rail');
+      return;
+    }
+
+    let x1, y1, x2, y2;
+
+    switch (dir) {
+      case 'N':
+        x1 = cx - half; y1 = cy - half; x2 = cx + half; y2 = cy - half;
+        break;
+      case 'S':
+        x1 = cx - half; y1 = cy + half; x2 = cx + half; y2 = cy + half;
+        break;
+      case 'E':
+        x1 = cx + half; y1 = cy - half; x2 = cx + half; y2 = cy + half;
+        break;
+      case 'W':
+      default:
+        x1 = cx - half; y1 = cy - half; x2 = cx - half; y2 = cy + half;
+        break;
+    }
+
+    this._line(group, x1, y1, x2, y2, 'road-rail');
+  }
+
+  /** スタート・ゴールの丸ラベルを描画する */
+  _drawMarker(svg, cell, label, cls) {
+    const { toX, toY } = this.pos;
+    const x = toX(cell.row, cell.col);
+    const y = toY(cell.row, cell.col);
+    const g = document.createElementNS(SVG_NS, 'g');
+    g.setAttribute('class', cls);
+
+    const circle = document.createElementNS(SVG_NS, 'circle');
+    circle.setAttribute('cx', x);
+    circle.setAttribute('cy', y);
+    // 迷路のマスからはみ出してもよいので、しっかり目立つ大きさにする。
+    circle.setAttribute('r', this.cellSize * 0.65);
+    g.appendChild(circle);
+
+    const text = document.createElementNS(SVG_NS, 'text');
+    text.setAttribute('x', x);
+    text.setAttribute('y', y + 9);
+    text.setAttribute('text-anchor', 'middle');
+    text.textContent = label;
+    g.appendChild(text);
+
+    svg.appendChild(g);
+  }
+
+  /** モンスター画像を描画する */
+  _drawMonster(svg, m) {
+    const { toX, toY } = this.pos;
+    const x = toX(m.cell.row, m.cell.col);
+    const y = toY(m.cell.row, m.cell.col);
+    const size = this.cellSize * 0.82;
+
+    const img = document.createElementNS(SVG_NS, 'image');
+    const href = m.monster.getHref();
+    img.setAttributeNS(XLINK_NS, 'href', href);
+    img.setAttribute('href', href);
+    img.setAttribute('x', (x - size / 2).toFixed(2));
+    img.setAttribute('y', (y - size / 2).toFixed(2));
+    img.setAttribute('width', size.toFixed(2));
+    img.setAttribute('height', size.toFixed(2));
+    img.setAttribute('class', 'monster-img');
+    svg.appendChild(img);
+  }
+
+  /** 問題ボックス（問題文＋3つの選択肢）を描画する */
+  _drawProblemBox(svg, p) {
+    const { toX, toY } = this.pos;
+    const x = toX(p.cell.row, p.cell.col);
+    const y = toY(p.cell.row, p.cell.col);
+    const boxW = this.cellSize * 2.0;
+    const boxH = this.cellSize * 1.55;
+
+    const g = document.createElementNS(SVG_NS, 'g');
+    g.setAttribute('class', 'problem-box');
+
+    const rect = document.createElementNS(SVG_NS, 'rect');
+    rect.setAttribute('x', (x - boxW / 2).toFixed(2));
+    rect.setAttribute('y', (y - boxH / 2).toFixed(2));
+    rect.setAttribute('width', boxW.toFixed(2));
+    rect.setAttribute('height', boxH.toFixed(2));
+    rect.setAttribute('rx', 10);
+    rect.setAttribute('class', 'problem-box-fill');
+    g.appendChild(rect);
+
+    // 入り口方向は迷路生成時（tryPlaceAt）に確定しているので、それを使う。
+    // （方向が4つしかない四角形と違い、六角形は6方向あるため
+    //  「選択肢3方向以外の残り1方向」という消去法は使えない）
+    const entranceDir = p.entranceDir;
+
+    this._drawBoxBorder(g, x, y, boxW, boxH, entranceDir);
+
+    const qText = document.createElementNS(SVG_NS, 'text');
+    qText.setAttribute('x', x);
+    qText.setAttribute('y', y + 12);
+    qText.setAttribute('text-anchor', 'middle');
+    qText.setAttribute('class', 'problem-question');
+    qText.textContent = p.questionText;
+    g.appendChild(qText);
+
+    svg.appendChild(g);
+
+    for (const option of p.options) {
+      this._drawExitLabel(svg, p.cell, option, boxW, boxH);
+    }
+  }
+
+  /**
+   * 問題ボックスの枠線を描く。入り口方向（entranceDir）の辺だけは、
+   * 通路がそのまま box の中へ続いているように見えるよう、中央に
+   * 通路幅ぶんの隙間を開けて2本の線として描く。
+   */
+  _drawBoxBorder(g, x, y, boxW, boxH, entranceDir) {
+    const halfW = boxW / 2;
+    const halfH = boxH / 2;
+    const gapSize = this.cellSize * 0.5;
+
+    const nw = [x - halfW, y - halfH];
+    const ne = [x + halfW, y - halfH];
+    const sw = [x - halfW, y + halfH];
+    const se = [x + halfW, y + halfH];
+
+    const sides = {
+      N: [nw, ne],
+      S: [sw, se],
+      E: [ne, se],
+      W: [nw, sw],
+    };
+
+    // 問題ボックスは常に長方形として描くため（六角形の枠にはしない）、
+    // 六角形の6方向は見た目上近い長方形の辺（N/S/E/W）に割り当てる。
+    const HEX_TO_RECT_SIDE = { N: 'N', S: 'S', E: 'E', W: 'W', NE: 'N', NW: 'N', SE: 'S', SW: 'S' };
+    const entranceSide = HEX_TO_RECT_SIDE[entranceDir] || entranceDir;
+
+    for (const dir of Object.keys(sides)) {
+      const [[x1, y1], [x2, y2]] = sides[dir];
+
+      if (dir !== entranceSide) {
+        this._line(g, x1, y1, x2, y2, 'problem-box-border');
+        continue;
+      }
+
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const len = Math.sqrt(dx * dx + dy * dy) || 1;
+      const ux = dx / len;
+      const uy = dy / len;
+      const midX = (x1 + x2) / 2;
+      const midY = (y1 + y2) / 2;
+      const half = gapSize / 2;
+
+      const gapStartX = midX - ux * half;
+      const gapStartY = midY - uy * half;
+      const gapEndX = midX + ux * half;
+      const gapEndY = midY + uy * half;
+
+      this._line(g, x1, y1, gapStartX, gapStartY, 'problem-box-border');
+      this._line(g, gapEndX, gapEndY, x2, y2, 'problem-box-border');
+    }
+  }
+
+  /**
+   * 問題ボックスの各出口方向に、選択肢のテキストを配置する。
+   *
+   * 隣の（枝の）マスがそこで行き止まりになっている場合、そのマスの
+   * 奥側には必ず壁が描かれる。そのマスは問題セルからちょうど1マス分
+   * （cellSize）離れた場所にあり、奥の壁はそこからさらに半マス
+   * （cellSize/2）先、つまり問題セルの中心から1.5×cellSizeの位置に
+   * 来る。ラベルがこの壁に絶対に届かないよう、はみ出す距離を
+   * 「ボックスの端からわずかだけ」に厳密に抑える。
+   */
+  _drawExitLabel(svg, cell, option, boxW, boxH) {
+    const { toX, toY } = this.pos;
+    const cx = toX(cell.row, cell.col);
+    const cy = toY(cell.row, cell.col);
+    const SQRT3_2 = 0.8660254037844386;
+    const dirVec = {
+      N: [0, -1], S: [0, 1], E: [1, 0], W: [-1, 0],
+      NE: [0.5, -SQRT3_2], NW: [-0.5, -SQRT3_2],
+      SE: [0.5, SQRT3_2], SW: [-0.5, SQRT3_2],
+    };
+    const [dx, dy] = dirVec[option.dir] || [0, 0];
+
+    const w = this.cellSize * 0.56;
+    const h = this.cellSize * 0.46;
+
+    const straddle = this.cellSize * 0.055;
+    const distX = boxW / 2 + straddle;
+    const distY = boxH / 2 + straddle;
+
+    // N/S/E/W では dx・dy の一方が必ず0になるため、この式は従来の
+    // 「軸に沿った距離だけをそのまま使う」挙動とまったく同じになる。
+    // 斜め方向（六角形）ではボックスの角の外側にラベルが置かれる。
+    const x = cx + dx * distX;
+    const y = cy + dy * distY;
+
+    const g = document.createElementNS(SVG_NS, 'g');
+    g.setAttribute('class', 'exit-label-group');
+
+    const bg = document.createElementNS(SVG_NS, 'rect');
+    bg.setAttribute('x', (x - w / 2).toFixed(2));
+    bg.setAttribute('y', (y - h / 2).toFixed(2));
+    bg.setAttribute('width', w.toFixed(2));
+    bg.setAttribute('height', h.toFixed(2));
+    bg.setAttribute('rx', 6);
+    bg.setAttribute('class', 'exit-label-bg');
+    g.appendChild(bg);
+
+    const text = document.createElementNS(SVG_NS, 'text');
+    text.setAttribute('x', x);
+    text.setAttribute('y', y + 9);
+    text.setAttribute('text-anchor', 'middle');
+    text.setAttribute('class', 'exit-label-text');
+    text.textContent = option.text;
+    g.appendChild(text);
+
+    svg.appendChild(g);
+  }
+}
+
+  // ---- 公開API ----
+  MK.MazeRenderer = MazeRenderer;
+})(window.MK);
+</script>
+<script>
+/**
+ * editor.js
+ * ---------------------------------------------------------------------------
+ * 編集画面のUIを管理するクラス。
+ * 問題（問題文・正解・誤答1・誤答2・モンスター画像）の追加・削除、
+ * 難易度の選択、迷路作成ボタン、JSON保存・読込ボタンを扱う。
+ * ---------------------------------------------------------------------------
+ */
+window.MK = window.MK || {};
+
+(function (MK) {
+  'use strict';
+
+  const SaveManager = MK.SaveManager;
+
+/** HTMLエスケープ（ユーザー入力をinnerHTMLに安全に反映するため） */
+function escapeHtml(str) {
+  return String(str || '').replace(/[&<>"']/g, (ch) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]
+  ));
+}
+
+class Editor {
+  /**
+   * @param {Object} callbacks
+   * @param {(state:{problems:Array, difficulty:string})=>void} callbacks.onGenerate
+   * @param {()=>void} [callbacks.onLoaded] JSON読込が完了し編集画面に戻すべき時に呼ばれる
+   */
+  constructor({ onGenerate, onLoaded }) {
+    this.problems = [];
+    this.nextId = 1;
+    this.onGenerate = onGenerate;
+    this.onLoaded = onLoaded || null;
+
+    this._cacheDom();
+    this._bindEvents();
+    this._addProblemRow(); // 最初は空の行を1つ用意しておく
+  }
+
+  _cacheDom() {
+    this.tableBody = document.getElementById('problem-list');
+    this.difficultySelect = document.getElementById('difficulty-select');
+    this.shapeSelect = document.getElementById('maze-shape-select');
+    this.titleInput = document.getElementById('title-input');
+    this.themeInput = document.getElementById('theme-input');
+    this.addBtn = document.getElementById('add-problem-btn');
+    this.generateBtn = document.getElementById('generate-btn');
+    this.saveBtn = document.getElementById('save-json-btn');
+    this.loadInput = document.getElementById('load-json-input');
+    this.emptyNotice = document.getElementById('empty-notice');
+  }
+
+  _bindEvents() {
+    this.addBtn.addEventListener('click', () => this._addProblemRow());
+    this.generateBtn.addEventListener('click', () => this._handleGenerate());
+    this.saveBtn.addEventListener('click', () => this._handleSave());
+    this.loadInput.addEventListener('change', (e) => this._handleLoad(e));
+  }
+
+  /**
+   * 問題行をテーブルに追加する。
+   * @param {Object|null} data 既存データ（JSON読込時など）。nullなら空行。
+   */
+  _addProblemRow(data = null) {
+    const id = this.nextId++;
+    const problem = data
+      ? { ...data, id }
+      : { id, question: '', correct: '', wrong1: '', wrong2: '', monsterImage: null };
+    this.problems.push(problem);
+
+    const tr = document.createElement('tr');
+    tr.dataset.id = String(id);
+    tr.innerHTML = `
+      <td><input type="text" class="q-input" value="${escapeHtml(problem.question)}" placeholder="例: 3+4"></td>
+      <td><input type="text" class="c-input" value="${escapeHtml(problem.correct)}" placeholder="7"></td>
+      <td><input type="text" class="w1-input" value="${escapeHtml(problem.wrong1)}" placeholder="6"></td>
+      <td><input type="text" class="w2-input" value="${escapeHtml(problem.wrong2)}" placeholder="8"></td>
+      <td class="monster-cell">
+        <label class="btn monster-file-btn">
+          画像を選ぶ
+          <input type="file" class="monster-input" accept="image/*">
+        </label>
+        <img class="monster-preview" src="${problem.monsterImage || ''}" style="${problem.monsterImage ? '' : 'display:none;'}" alt="モンスター画像">
+      </td>
+      <td><button class="remove-btn" type="button">削除</button></td>
+    `;
+    this.tableBody.appendChild(tr);
+
+    tr.querySelector('.q-input').addEventListener('input', (e) => {
+      problem.question = e.target.value;
+    });
+    tr.querySelector('.c-input').addEventListener('input', (e) => {
+      problem.correct = e.target.value;
+    });
+    tr.querySelector('.w1-input').addEventListener('input', (e) => {
+      problem.wrong1 = e.target.value;
+    });
+    tr.querySelector('.w2-input').addEventListener('input', (e) => {
+      problem.wrong2 = e.target.value;
+    });
+
+    const fileInput = tr.querySelector('.monster-input');
+    const preview = tr.querySelector('.monster-preview');
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files && fileInput.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        problem.monsterImage = reader.result;
+        preview.src = reader.result;
+        preview.style.display = '';
+      };
+      reader.readAsDataURL(file);
+    });
+
+    tr.querySelector('.remove-btn').addEventListener('click', () => {
+      this.problems = this.problems.filter((p) => p.id !== id);
+      tr.remove();
+      this._updateEmptyNotice();
+    });
+
+    this._updateEmptyNotice();
+  }
+
+  _updateEmptyNotice() {
+    if (!this.emptyNotice) return;
+    this.emptyNotice.style.display = this.problems.length === 0 ? '' : 'none';
+  }
+
+  _handleGenerate() {
+    const valid = this.problems.filter(
+      (p) => p.question.trim() && p.correct.trim() && p.wrong1.trim() && p.wrong2.trim()
+    );
+    if (valid.length === 0) {
+      alert('問題・正解・誤答1・誤答2をすべて入力した問題を、少なくとも1つ用意してください。');
+      return;
+    }
+    if (this.onGenerate) {
+      this.onGenerate({
+        problems: valid,
+        difficulty: this.difficultySelect.value,
+        shape: this.shapeSelect ? this.shapeSelect.value : 'square',
+        title: this.titleInput.value.trim(),
+        theme: this.themeInput.value.trim(),
+      });
+    }
+  }
+
+  _handleSave() {
+    SaveManager.exportJSON({
+      problems: this.problems,
+      difficulty: this.difficultySelect.value,
+      shape: this.shapeSelect ? this.shapeSelect.value : 'square',
+      title: this.titleInput.value.trim(),
+      theme: this.themeInput.value.trim(),
+    });
+  }
+
+  async _handleLoad(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    try {
+      const data = await SaveManager.importJSON(file);
+      this.loadData(data);
+    } catch (err) {
+      alert('JSONファイルの読み込みに失敗しました: ' + err.message);
+    } finally {
+      event.target.value = '';
+    }
+  }
+
+  /** JSONから読み込んだデータを編集画面に反映する */
+  loadData(data) {
+    this.tableBody.innerHTML = '';
+    this.problems = [];
+    this.nextId = 1;
+    const problems = Array.isArray(data.problems) ? data.problems : [];
+    if (problems.length === 0) {
+      this._addProblemRow();
+    } else {
+      problems.forEach((p) => this._addProblemRow(p));
+    }
+    if (data.difficulty) {
+      this.difficultySelect.value = data.difficulty;
+    }
+    if (data.shape && this.shapeSelect) {
+      this.shapeSelect.value = data.shape;
+    }
+    this.titleInput.value = data.title || '';
+    this.themeInput.value = data.theme || '';
+    this._updateEmptyNotice();
+    if (this.onLoaded) this.onLoaded();
+  }
+
+  getState() {
+    return {
+      problems: this.problems,
+      difficulty: this.difficultySelect.value,
+      shape: this.shapeSelect ? this.shapeSelect.value : 'square',
+      title: this.titleInput.value.trim(),
+      theme: this.themeInput.value.trim(),
+    };
+  }
+}
+
+  // ---- 公開API ----
+  MK.Editor = Editor;
+})(window.MK);
+</script>
+<script>
+/**
+ * main.js
+ * ---------------------------------------------------------------------------
+ * アプリ全体の統合（コンポジションルート）。
+ * 編集画面と教材（迷路）画面の切り替え、迷路生成の指揮、印刷ボタンの
+ * 処理などを行う MazeApp クラスをここで定義し、DOMContentLoaded時に
+ * 1つだけインスタンス化する。グローバル変数は一切使用しない。
+ * ---------------------------------------------------------------------------
+ */
+window.MK = window.MK || {};
+
+(function (MK) {
+  'use strict';
+
+  const Editor = MK.Editor;
+  const MazeGrid = MK.MazeGrid;
+  const planProblemPlacements = MK.planProblemPlacements;
+  const computeSegments = MK.computeSegments;
+  const shuffleArray = MK.shuffleArray;
+  const ClusterMazeGenerator = MK.ClusterMazeGenerator;
+  const MazeRenderer = MK.MazeRenderer;
+  const MonsterManager = MK.MonsterManager;
+
+/** 難易度ごとの基本的なグリッドサイズ */
+const BASE_SIZE_BY_DIFFICULTY = {
+  small: { rows: 7, cols: 6 },
+  medium: { rows: 9, cols: 8 },
+  large: { rows: 12, cols: 10 },
+};
+
+/** 迷路生成を諦めるまでの最大試行回数（毎回グリッドを少しずつ広げていく） */
+const MAX_GENERATION_ATTEMPTS = 15;
+// 六角形は1マスあたりの分岐が多い分、正解＋誤答2つ分の安全な空きを確保
+// できる配置が四角形より見つかりにくく、同じ盤面サイズでは問題数を
+// 多く入れにくい。そのため六角形のときだけ試行回数を増やし、盤面の
+// 広がり方も大きくして、10問程度までは無理なく収まるようにしている。
+const MAX_GENERATION_ATTEMPTS_HEX = 24;
+const GRID_GROWTH_STEP_HEX = 3; // 四角形は2ずつ広げる（下のgrowth計算を参照）
+const PROBLEM_EXTRA_MULT_HEX = 2.2; // 四角形は常に1倍
+// 六角形は「東西の目の詰まり方」が縦方向のセル間隔より広いため、行数・列数を
+// 同じ数にすると印刷時に横長になりすぎる（A4縦に対して非効率）。
+// 列数だけ少し絞ることで、全体の見た目を縦長寄りに近づけている。
+const COLS_SCALE_HEX = 0.8;
+
+/**
+ * 難易度ごとのループ辺の密度（0〜1）。
+ */
+const LOOP_DENSITY_BY_DIFFICULTY = {
+  small: 0.34,
+  medium: 0.4,
+  large: 0.46,
+};
+
+/**
+ * アプリケーション全体を管理するクラス。
+ */
+class MazeApp {
+  constructor() {
+    this.editorScreen = document.getElementById('editor-screen');
+    this.mazeScreen = document.getElementById('maze-screen');
+    this.mazeContainer = document.getElementById('maze-container');
+
+    this.renderer = new MazeRenderer(this.mazeContainer);
+    this.monsterManager = new MonsterManager();
+
+    this.editor = new Editor({
+      onGenerate: (state) => this._handleGenerate(state),
+      onLoaded: () => this.showEditor(),
+    });
+
+    this._bindScreenControls();
+  }
+
+  _bindScreenControls() {
+    document.getElementById('back-to-edit-btn').addEventListener('click', () => this.showEditor());
+    document.getElementById('print-btn').addEventListener('click', () => this.print());
+    document.getElementById('save-pdf-btn').addEventListener('click', () => this.savePdf());
+  }
+
+  showEditor() {
+    this.mazeScreen.classList.add('hidden');
+    this.editorScreen.classList.remove('hidden');
+  }
+
+  showMaze() {
+    this.editorScreen.classList.add('hidden');
+    this.mazeScreen.classList.remove('hidden');
+  }
+
+  /**
+   * 「迷路作成」ボタンが押されたときの処理。
+   */
+  _handleGenerate(state) {
+    const shape = state.shape === 'hex' ? 'hex' : 'square';
+    MK.setMazeShape(shape);
+
+    const base = BASE_SIZE_BY_DIFFICULTY[state.difficulty] || BASE_SIZE_BY_DIFFICULTY.medium;
+    const problemCount = state.problems.length;
+
+    const maxAttempts = shape === 'hex' ? MAX_GENERATION_ATTEMPTS_HEX : MAX_GENERATION_ATTEMPTS;
+    const growthStep = shape === 'hex' ? GRID_GROWTH_STEP_HEX : 2;
+    const extraMult = shape === 'hex' ? PROBLEM_EXTRA_MULT_HEX : 1;
+
+    let result = null;
+    for (let attempt = 0; attempt < maxAttempts && !result; attempt++) {
+      const growth = Math.floor(attempt / 2) * growthStep;
+      const extra = Math.ceil((problemCount / 2) * extraMult);
+      const rows = base.rows + extra + growth;
+      const rawCols = base.cols + extra + growth;
+      const cols = shape === 'hex' ? Math.max(4, Math.round(rawCols * COLS_SCALE_HEX)) : rawCols;
+      result = this._tryGenerate(rows, cols, state.problems, state.difficulty);
+    }
+
+    if (!result) {
+      alert(
+        '迷路の生成に失敗しました。問題数を減らすか、迷路の大きさを変えてもう一度お試しください。'
+      );
+      return;
+    }
+
+    this.renderer.render(result.grid, result.layout, { title: state.title, theme: state.theme, shape });
+    this.showMaze();
+  }
+
+  /**
+   * 指定したサイズで1回、迷路の生成を試みる。
+   * @returns {{grid, layout}|null} 成功時は描画に必要なデータ、失敗時は null。
+   */
+  _tryGenerate(rows, cols, problemDataList, difficulty) {
+    const grid = new MazeGrid(rows, cols);
+    const start = grid.get(0, cols - 1); // スタートは右上
+    const goal = grid.get(rows - 1, 0); // ゴールは左下
+    start.role = 'start';
+    goal.role = 'goal';
+
+    const generator = new ClusterMazeGenerator(grid);
+    generator.generateSpanningTree();
+
+    const plan = planProblemPlacements(grid, start, goal, problemDataList.length);
+    if (!plan) return null;
+
+    this.monsterManager.clear();
+
+    const problemsLayout = [];
+    const monstersLayout = [];
+
+    plan.placements.forEach((placement, i) => {
+      const data = problemDataList[i];
+      const optionEntries = [
+        { text: data.correct, isCorrect: true, dir: placement.correctDir },
+        { text: data.wrong1, isCorrect: false, dir: placement.branches[0].dir },
+        { text: data.wrong2, isCorrect: false, dir: placement.branches[1].dir },
+      ];
+      const shuffledOptions = shuffleArray(optionEntries);
+
+      problemsLayout.push({
+        cell: placement.cell,
+        questionText: data.question,
+        options: shuffledOptions,
+        entranceDir: placement.incomingDir,
+      });
+
+      placement.branches.forEach((branch, branchIndex) => {
+        const monster = this.monsterManager.create(`${data.id}-${branchIndex}`, data.monsterImage);
+        monstersLayout.push({ cell: branch.monsterCell, monster });
+      });
+    });
+
+    const segmentMap = computeSegments(grid, start, plan.trunkPath, plan.placements);
+    const loopDensity = LOOP_DENSITY_BY_DIFFICULTY[difficulty] || LOOP_DENSITY_BY_DIFFICULTY.medium;
+    generator.addLoopEdges(loopDensity, segmentMap);
+
+    // 最終安全確認: スタートからゴール、およびすべての問題への到達可能性
+    if (!grid.bfsPath(start, goal)) return null;
+    for (const p of problemsLayout) {
+      if (!grid.bfsPath(start, p.cell)) return null;
+    }
+
+    return {
+      grid,
+      layout: {
+        start,
+        goal,
+        problems: problemsLayout,
+        monsters: monstersLayout,
+      },
+    };
+  }
+
+  /** 印刷ボタンの処理（A4縦1ページに収まるようCSS側で自動縮小される） */
+  print() {
+    window.print();
+  }
+
+  /**
+   * 「PDFに保存」ボタンの処理。
+   */
+  savePdf() {
+    alert(
+      'これから印刷ダイアログが開きます。\n' +
+      '「送信先」または「プリンター」の欄で「PDFに保存」（または「Microsoft Print to PDF」）を選んで保存してください。'
+    );
+    window.print();
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  new MazeApp();
+});
+
+})(window.MK);
+</script>
+</body>
+</html>
