@@ -1,0 +1,1207 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>クロスワード作成アプリ</title>
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Zen+Maru+Gothic:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #17223b;
+    --paper: #ffffff;
+    --line: #d8d3c6;
+    --accent: #ec6b45;
+    --teal: #168a88;
+    --amber: #f2a71b;
+    --soft: #f4efe4;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Zen Maru Gothic", "DM Sans", sans-serif;
+    color: var(--ink);
+    background: #f5f0e7;
+  }
+
+  .app-shell {
+    width: 100%;
+    min-height: 100vh;
+    background:
+      linear-gradient(rgba(23,34,59,.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(23,34,59,.035) 1px, transparent 1px),
+      #f5f0e7;
+    background-size: 26px 26px;
+  }
+
+  .paper-card {
+    background: rgba(255, 253, 247, .94);
+    border: 1px solid rgba(23, 34, 59, .12);
+    box-shadow: 0 14px 34px rgba(23, 34, 59, .08);
+  }
+
+  .dashed-rule { border-top: 2px dashed rgba(23, 34, 59, .18); }
+
+  .question-row { animation: rise-in .3s ease both; }
+  @keyframes rise-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .grid-wrap {
+    overflow: auto;
+    padding: 8px;
+    background: #e9e2d4;
+    border: 1px solid #cfc5b3;
+    border-radius: 18px;
+  }
+
+  .crossword-grid {
+    display: grid;
+    width: max-content;
+    gap: 2px;
+    background: #9b947f;
+    padding: 2px;
+    border-radius: 8px;
+  }
+
+  .cross-cell {
+    width: 42px;
+    height: 42px;
+    position: relative;
+    border: 0;
+    border-radius: 2px;
+    background: var(--paper);
+    color: var(--ink);
+    text-align: center;
+    font-size: 1.15rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    outline: none;
+    transition: background .18s ease, box-shadow .18s ease;
+  }
+
+  .cross-cell:focus {
+    background: #fff4cf;
+    box-shadow: inset 0 0 0 3px var(--accent);
+    z-index: 2;
+  }
+
+  .cross-cell.correct { background: #d8f1e8; }
+  .cross-cell.incorrect { background: #ffe0d6; }
+  .cross-cell.revealed {
+    background: #fff2cc;
+    color: #8a5a00;
+    cursor: not-allowed;
+    box-shadow: inset 0 0 0 2px rgba(242,167,27,.55);
+  }
+
+  @media print {
+    @page { size: A4; margin: 10mm; }
+    html, body { height: auto !important; }
+    body, .app-shell {
+      background: #ffffff !important;
+      background-image: none !important;
+      color: #000000 !important;
+    }
+    header, footer, #edit-button, .no-print, #check-result, #builder-view {
+      display: none !important;
+    }
+    #puzzle-view {
+      display: block !important;
+      max-width: 100% !important;
+      width: 100% !important;
+      padding: 0 !important;
+      margin: 0 !important;
+    }
+    #puzzle-view > div:first-of-type { margin-bottom: 3mm !important; }
+    #puzzle-view p.no-print { display: none !important; }
+    .puzzle-title-input {
+      border: none !important;
+      background: transparent !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      text-align: center !important;
+      font-size: 22pt !important;
+      color: #000000 !important;
+      padding: 0 !important;
+      margin-bottom: 5mm !important;
+    }
+    #puzzle-layout {
+      display: block !important;
+      width: 100% !important;
+    }
+    .paper-card {
+      border: none !important;
+      box-shadow: none !important;
+      background: #ffffff !important;
+      padding: 0 !important;
+      margin-bottom: 0 !important;
+    }
+    #grid-panel { margin-bottom: 4mm !important; }
+    #grid-panel h3, #clue-panel h3, #grid-panel > div:first-child, #clue-panel > div:first-child { display: none !important; }
+    .grid-wrap {
+      background: #ffffff !important;
+      border: none !important;
+      padding: 0 !important;
+      overflow: visible !important;
+      display: flex;
+      justify-content: center;
+    }
+    .crossword-grid {
+      background: #000000 !important;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+      grid-template-columns: repeat(var(--print-cols, 10), var(--print-cell-size, 8mm)) !important;
+      grid-auto-rows: var(--print-cell-size, 8mm) !important;
+      width: max-content !important;
+    }
+    .cross-cell, .black-cell {
+      width: var(--print-cell-size, 8mm) !important;
+      height: var(--print-cell-size, 8mm) !important;
+    }
+    .cross-cell {
+      background: #ffffff !important;
+      color: #000000 !important;
+      border: 1px solid #000000 !important;
+      font-size: calc(var(--print-cell-size, 8mm) * 0.42) !important;
+      print-color-adjust: exact;
+      -webkit-print-color-adjust: exact;
+    }
+    .cross-cell.revealed { background: #ffffff !important; color: #000000 !important; }
+    .black-cell { background: #cbd5e1 !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    .cell-number {
+      font-size: calc(var(--print-cell-size, 8mm) * 0.24) !important;
+      top: calc(var(--print-cell-size, 8mm) * 0.04) !important;
+      left: calc(var(--print-cell-size, 8mm) * 0.08) !important;
+    }
+    #clue-list {
+      columns: var(--print-clue-columns, 2);
+      column-gap: 7mm;
+      display: block !important;
+    }
+    .hint-item {
+      break-inside: avoid;
+      -webkit-column-break-inside: avoid;
+      margin-bottom: 2.5mm !important;
+      padding: 1.5mm 2.5mm !important;
+      border-left-width: 3px !important;
+      background: #ffffff !important;
+    }
+    .hint-item p { margin: 0 !important; font-size: 8.5pt !important; line-height: 1.3 !important; }
+    .hint-item span { transform: scale(.85); }
+  }
+
+  .cell-number {
+    position: absolute;
+    top: 3px;
+    left: 5px;
+    font-family: "DM Sans", sans-serif;
+    font-size: .62rem;
+    font-weight: 700;
+    color: var(--accent);
+    pointer-events: none;
+  }
+
+  .black-cell { width: 42px; height: 42px; background: #cbd5e1; border-radius: 2px; }
+
+  .hint-item { border-left: 4px solid var(--teal); background: #f6fbfa; }
+  .hint-item:hover { background: #eaf6f3; }
+  .hint-item.filler-item { border-left-color: var(--amber); background: #fff8ec; }
+  .hint-item.filler-item:hover { background: #fff2da; }
+
+  .view-hidden { display: none !important; }
+
+  @media (max-width: 640px) {
+    .cross-cell, .black-cell { width: 34px; height: 34px; }
+    .cross-cell { font-size: 1rem; }
+  }
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <header class="border-b border-slate-900/15 bg-[#17223b] text-white">
+    <div class="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-5 py-5 sm:px-8">
+      <div>
+        <p class="mb-1 text-xs font-bold tracking-[0.2em] text-[#f7b267]">ことば遊び教材ジェネレーター</p>
+        <h1 class="text-xl sm:text-2xl font-bold leading-tight">クロスワード作成アプリ</h1>
+      </div>
+      <button id="edit-button" type="button" class="view-hidden inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/30 px-4 py-2 text-sm font-bold transition hover:-translate-y-0.5 hover:bg-white/20">
+        <i data-lucide="pencil" class="h-4 w-4"></i> 編集する
+      </button>
+    </div>
+  </header>
+
+  <main class="w-full">
+    <section id="builder-view" class="mx-auto w-full max-w-6xl px-5 py-8 sm:px-8 sm:py-12">
+      <div class="grid gap-7 lg:grid-cols-[.82fr_1.18fr]">
+        <aside class="flex flex-col gap-7">
+          <div class="paper-card rounded-[28px] p-7 sm:p-9">
+            <div class="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#ec6b45] text-white">
+              <i data-lucide="puzzle" class="h-6 w-6"></i>
+            </div>
+            <h2 class="mb-4 text-lg font-bold leading-snug">答えと質問を入れるだけで、自動でクロスワードができます</h2>
+            <p class="leading-8 text-sm text-slate-700">作りたい言葉と、その言葉を導くヒント（質問）を入力するだけで、文字が重なるように自動でパズルを組み立てます。プリント教材や教室のアクティビティにご利用ください。</p>
+            <div class="dashed-rule my-7"></div>
+            <div class="rounded-2xl bg-[#f4efe4] p-5">
+              <p class="mb-2 font-bold text-sm">作成のルール</p>
+              <ul class="space-y-2 text-sm leading-6 text-slate-700">
+                <li>・答えは1〜13文字のひらがな・カタカナ・英数字で入力してください。</li>
+                <li>・問題は1〜10問まで登録できます。</li>
+                <li>・他の言葉と一文字も重ならない言葉は、自動で「うめ言葉」がつながりを作ります（ひらがなで最初から入力済みになります）。</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="paper-card rounded-[28px] p-7 sm:p-8">
+            <div class="mb-4 flex items-center gap-3">
+              <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-[#168a88] text-white"><i data-lucide="save" class="h-5 w-5"></i></span>
+              <h3 class="font-bold text-base">保存した言葉セット</h3>
+            </div>
+            <p class="mb-4 text-xs leading-5 text-slate-600">入力した「答えと質問」のセットに名前をつけて保存し、あとから呼び出せます（パズルの解答状態は保存されません）。</p>
+            <div class="mb-3">
+              <label class="mb-1 block text-xs font-bold text-slate-600">セット名</label>
+              <input id="save-set-name" type="text" placeholder="例：どうぶつクイズ" class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-[#ec6b45] focus:ring-2 focus:ring-orange-200" autocomplete="off">
+            </div>
+            <button id="save-set-button" type="button" class="mb-4 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#168a88] px-4 py-2.5 text-sm font-bold text-white transition hover:-translate-y-0.5">
+              <i data-lucide="save" class="h-4 w-4"></i> 今のセットを保存
+            </button>
+            <div class="dashed-rule my-4"></div>
+            <label class="mb-1 block text-xs font-bold text-slate-600">保存済みのセット</label>
+            <select id="saved-set-select" class="mb-3 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-[#168a88]"></select>
+            <div class="flex gap-2">
+              <button id="load-set-button" type="button" class="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border-2 border-slate-300 px-3 py-2.5 text-sm font-bold transition hover:-translate-y-0.5">
+                <i data-lucide="folder-open" class="h-4 w-4"></i> 呼び出す
+              </button>
+              <button id="delete-set-button" type="button" class="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-red-200 px-3 py-2.5 text-sm font-bold text-red-600 transition hover:-translate-y-0.5 hover:bg-red-50">
+                <i data-lucide="trash-2" class="h-4 w-4"></i>
+              </button>
+            </div>
+          </div>
+        </aside>
+
+        <section class="paper-card rounded-[28px] p-5 sm:p-8">
+          <div class="mb-6 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 class="mb-2 font-bold text-lg">言葉と質問を入力</h2>
+              <p class="text-sm leading-6 text-slate-600">答え（ことば）と、それを当てるための質問（ヒント）を入力してください。</p>
+            </div>
+            <span id="question-count" class="rounded-full bg-[#e8f3f1] px-3 py-1 text-sm font-bold text-[#168a88]" aria-live="polite">3 / 10</span>
+          </div>
+          <form id="crossword-form">
+            <div class="mb-3 grid grid-cols-[minmax(0,.85fr)_minmax(0,1.45fr)_40px] gap-3 px-1 text-xs font-bold tracking-wide text-slate-600">
+              <span>答え（13文字まで）</span> <span>質問（ヒント）</span> <span aria-hidden="true"></span>
+            </div>
+            <div id="question-list" class="space-y-3"></div>
+            <div class="mt-5 flex flex-wrap gap-3">
+              <button id="add-question-button" type="button" class="inline-flex items-center gap-2 rounded-xl border-2 border-slate-300 px-4 py-3 text-sm font-bold transition hover:-translate-y-0.5">
+                <i data-lucide="plus" class="h-4 w-4"></i> 問題を追加
+              </button>
+              <button id="generate-button" type="submit" class="inline-flex items-center gap-2 rounded-xl bg-[#ec6b45] px-5 py-3 text-sm font-bold text-white shadow-lg shadow-orange-300/30 transition hover:-translate-y-0.5">
+                <i data-lucide="sparkles" class="h-4 w-4"></i> クロスワードを作成
+              </button>
+            </div>
+            <p id="form-message" class="mt-4 hidden rounded-xl px-4 py-3 text-sm font-bold" role="alert"></p>
+          </form>
+        </section>
+      </div>
+    </section>
+
+    <section id="puzzle-view" class="view-hidden mx-auto w-full max-w-6xl px-5 py-8 sm:px-8 sm:py-12">
+      <div class="mb-7 flex flex-wrap items-end justify-between gap-4">
+        <div class="min-w-0 flex-1">
+          <p class="mb-2 text-xs font-bold tracking-[0.2em] text-[#ec6b45] no-print">できあがり</p>
+          <label for="puzzle-title-input" class="sr-only">プリントの題名</label>
+          <input id="puzzle-title-input" type="text" maxlength="40" placeholder="クロスワードパズル"
+            class="puzzle-title-input w-full max-w-lg rounded-lg border-0 border-b-2 border-dashed border-slate-300 bg-transparent px-1 py-1 text-xl font-bold text-[#17223b] outline-none transition focus:border-[#ec6b45] focus:border-solid"
+            title="クリックしてプリントの題名を編集できます">
+        </div>
+        <div class="flex flex-wrap gap-3 no-print">
+          <button id="check-button" type="button" class="inline-flex items-center gap-2 rounded-xl bg-[#168a88] px-4 py-3 text-sm font-bold text-white transition hover:-translate-y-0.5">
+            <i data-lucide="check-circle-2" class="h-4 w-4"></i> 答え合わせ
+          </button>
+          <button id="clear-button" type="button" class="inline-flex items-center gap-2 rounded-xl border-2 border-slate-300 px-4 py-3 text-sm font-bold transition hover:-translate-y-0.5">
+            <i data-lucide="eraser" class="h-4 w-4"></i> リセット
+          </button>
+          <button id="print-button" type="button" class="inline-flex items-center gap-2 rounded-xl bg-[#17223b] px-4 py-3 text-sm font-bold text-white transition hover:-translate-y-0.5">
+            <i data-lucide="printer" class="h-4 w-4"></i> A4で印刷する
+          </button>
+          <button id="pdf-button" type="button" class="inline-flex items-center gap-2 rounded-xl border-2 border-slate-300 px-4 py-3 text-sm font-bold transition hover:-translate-y-0.5">
+            <i data-lucide="file-down" class="h-4 w-4"></i> PDFで保存する
+          </button>
+        </div>
+      </div>
+      <p class="no-print mb-5 -mt-3 text-xs text-slate-500">「PDFで保存する」を押すと印刷ダイアログが開きます。保存先（プリンター）を「PDFに保存」に選ぶとPDFファイルとして保存できます。用紙サイズはA4に設定されています。</p>
+
+      <div id="puzzle-layout" class="grid gap-7 lg:grid-cols-[minmax(0,1.25fr)_minmax(270px,.75fr)]">
+        <section id="grid-panel" class="paper-card rounded-[28px] p-5 sm:p-7">
+          <div class="mb-5 flex items-center gap-3">
+            <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-[#17223b] text-white"><i data-lucide="grid-3x3" class="h-5 w-5"></i></span>
+            <h3 class="font-bold text-base">パズル</h3>
+          </div>
+          <div class="grid-wrap">
+            <div id="crossword-grid" class="crossword-grid" aria-label="クロスワードの入力欄"></div>
+          </div>
+          <p id="check-result" class="mt-4 hidden rounded-xl px-4 py-3 text-sm font-bold" aria-live="polite"></p>
+        </section>
+        <aside id="clue-panel" class="paper-card rounded-[28px] p-5 sm:p-7">
+          <div class="mb-5 flex items-center gap-3">
+            <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-[#168a88] text-white"><i data-lucide="list-ordered" class="h-5 w-5"></i></span>
+            <h3 class="font-bold text-base">問題一覧</h3>
+          </div>
+          <ol id="clue-list" class="space-y-3"></ol>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <footer class="w-full px-5 pb-7 sm:px-8">
+    <div class="mx-auto max-w-6xl text-center">
+      <p class="text-xs text-slate-500">ことば遊び教材ジェネレーター ・ ブラウザ上だけで動作します</p>
+    </div>
+  </footer>
+</div>
+
+<template id="question-row-template">
+  <div class="question-row grid grid-cols-[minmax(0,.85fr)_minmax(0,1.45fr)_40px] items-center gap-3 rounded-2xl border border-slate-900/10 bg-white/70 p-3">
+    <div><label class="sr-only">答え</label>
+      <input type="text" maxlength="13" class="answer-input w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-bold text-slate-800 outline-none transition focus:border-[#ec6b45] focus:ring-2 focus:ring-orange-200" autocomplete="off">
+    </div>
+    <div><label class="sr-only">質問</label>
+      <input type="text" class="clue-input w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-[#168a88] focus:ring-2 focus:ring-teal-100" autocomplete="off">
+    </div>
+    <button type="button" class="remove-row inline-flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 transition hover:bg-red-50 hover:text-red-600" aria-label="この問題を削除">
+      <i data-lucide="trash-2" class="h-4 w-4"></i>
+    </button>
+  </div>
+</template>
+
+<script>
+  const MAX_QUESTIONS = 10;
+  const MAX_ANSWER_LENGTH = 13;
+  const SAVE_KEY = "crossword_saved_word_sets_v1";
+
+  // 他の言葉と重ならない語を橋渡しするための「うめ言葉」候補（ひらがな）
+  // 名詞だけでなく動詞・形容詞も含め、語頭・語尾のバリエーションを増やしている
+  const FILLER_WORDS = [
+    // 名詞（生き物・自然）
+    "あさがお","あひる","あんぱん","いちご","いす","いぬ","いか","うさぎ","うま","うちわ",
+    "えんぴつ","えほん","おにぎり","おかし","おんがく","かさ","かめ","かばん","きつね","きりん",
+    "くじら","くつした","けしごむ","こあら","ごりら","さかな","さくら","しまうま","すいか","すずめ",
+    "せみ","そら","たいこ","たまご","ちきゅう","つき","てがみ","とけい","とんぼ","なす",
+    "にじ","ぬいぐるみ","ねこ","のはら","はさみ","ひまわり","ふうせん","へちま","ほうき","まくら",
+    "みかん","むしめがね","めだか","もも","やかん","ゆき","ようふく","よる","らくだ","らんどせる",
+    "りんご","るすばん","れいぞうこ","ろうそく","わたあめ","わに","きつつき","つみき","きんぎょ",
+    "ぎんこう","うちゅう","うでどけい","けいと","だいこん","こんぶ","ぶどう","うどん",
+    "あり","あめ","いわし","うぐいす","うなぎ","えび","おたまじゃくし","かたつむり","かに","からす",
+    "きのこ","くも","くらげ","くり","くるみ","けむし","こおろぎ","さる","しか","しじみ",
+    "すずめばち","たけのこ","たこ","たぬき","ちょう","つばめ","つる","とかげ","なめくじ","にわとり",
+    "ねずみ","はえ","はち","ひつじ","ぶた","へび","ほたる","まぐろ","みつばち","むかで",
+    "めじろ","もぐら","やぎ","やもり","ゆうがお","ようちゅう","らっこ","りす","わかめ","わし",
+    // 名詞（生活・道具・食べ物）
+    "あぶらえ","いえ","うち","えいが","おかね","おさら","おふろ","かがみ","かぎ","かびん",
+    "きって","きっぷ","くし","くつ","けいたい","こうえん","さいふ","しゃしん","すいとう","せんぷうき",
+    "そうじき","たいや","ちゃわん","つくえ","てぶくろ","とびら","なべ","にんぎょう","ぬの","ねんど",
+    "のり","はぶらし","ひきだし","ふとん","へや","ほん","まど","みず","めがね","もうふ",
+    "やね","ゆびわ","ようき","らじお","りゆう","るいじ","れんが","ろうか","わりばし",
+    "あさひ","いど","うみ","えだ","おか","かわ","きし","けむり","こおり",
+    "さばく","しま","すな","せんろ","そうげん","たき","ちへいせん","つち","とうげ","なぎさ",
+    "にじいろ","ぬま","ねっこ","のうち","はやし","ひかり","ふもと","へいや","ほのお","まち",
+    "みさき","むら","もり","やま","ようがん","らくえん","りゅうひょう","れいざん","ろじ",
+    // 動詞（辞書形）
+    "たべる","のむ","あるく","はしる","およぐ","とぶ","かく","よむ","みる","きく",
+    "はなす","あそぶ","ねる","おきる","あらう","つくる","うたう","おどる","わらう","なく",
+    "はたらく","やすむ","まつ","もつ","きる","うる","かう","のぼる","おりる","まわる",
+    "とまる","すすむ","もどる","つづく","はじまる","おわる","あける","しめる","おす","ひく",
+    "まげる","のばす","ひろう","なげる","うごく","かわく","にげる","おいかける","かんがえる","おぼえる",
+    // 形容詞
+    "あかい","あおい","しろい","くろい","きいろい","たかい","やすい","ちいさい","おおきい","あつい",
+    "さむい","つめたい","あたたかい","からい","あまい","にがい","すっぱい","おいしい","たのしい","うれしい",
+    "かなしい","こわい","つよい","よわい","はやい","おそい","ながい","みじかい","ひろい","せまい",
+    "ふかい","あさい","かるい","おもい","あかるい","くらい","うるさい","やさしい","むずかしい","ねむい"
+  ];
+
+  const initialRows = [
+    { answer: "", clue: "" },
+    { answer: "", clue: "" },
+    { answer: "", clue: "" }
+  ];
+
+  const state = {
+    entries: [],
+    placements: [],
+    grid: new Map(),
+    revealedCells: new Set(),
+    minRow: 0,
+    maxRow: 0,
+    minCol: 0,
+    maxCol: 0
+  };
+
+  const questionList = document.getElementById("question-list");
+  const rowTemplate = document.getElementById("question-row-template");
+  const questionCount = document.getElementById("question-count");
+  const formMessage = document.getElementById("form-message");
+  const builderView = document.getElementById("builder-view");
+  const puzzleView = document.getElementById("puzzle-view");
+  const editButton = document.getElementById("edit-button");
+  const crosswordGrid = document.getElementById("crossword-grid");
+  const clueList = document.getElementById("clue-list");
+  const checkResult = document.getElementById("check-result");
+
+  const puzzleTitleInput = document.getElementById("puzzle-title-input");
+  const TITLE_KEY = "crossword_last_title";
+
+  const saveSetNameInput = document.getElementById("save-set-name");
+  const saveSetButton = document.getElementById("save-set-button");
+  const savedSetSelect = document.getElementById("saved-set-select");
+  const loadSetButton = document.getElementById("load-set-button");
+  const deleteSetButton = document.getElementById("delete-set-button");
+
+  function normalizeWord(value) {
+    return value.replace(/\s+/g, "").normalize("NFKC").toUpperCase();
+  }
+
+  function updateQuestionCount() {
+    const count = questionList.children.length;
+    questionCount.textContent = `${count} / ${MAX_QUESTIONS}`;
+    const addButton = document.getElementById("add-question-button");
+    addButton.disabled = count >= MAX_QUESTIONS;
+    addButton.classList.toggle("opacity-40", count >= MAX_QUESTIONS);
+    addButton.classList.toggle("cursor-not-allowed", count >= MAX_QUESTIONS);
+  }
+
+  function addQuestionRow(values = { answer: "", clue: "" }) {
+    if (questionList.children.length >= MAX_QUESTIONS) return;
+
+    const fragment = rowTemplate.content.cloneNode(true);
+    const row = fragment.querySelector(".question-row");
+    const answerInput = fragment.querySelector(".answer-input");
+    const clueInput = fragment.querySelector(".clue-input");
+
+    answerInput.value = values.answer;
+    clueInput.value = values.clue;
+    answerInput.setAttribute("aria-label", "答え（13文字まで）");
+    clueInput.setAttribute("aria-label", "質問");
+
+    fragment.querySelector(".remove-row").addEventListener("click", () => {
+      if (questionList.children.length > 1) {
+        row.remove();
+        updateQuestionCount();
+      } else {
+        showFormMessage("問題は1問以上残してください。", "error");
+      }
+    });
+
+    questionList.appendChild(fragment);
+    updateQuestionCount();
+    lucide.createIcons();
+  }
+
+  function showFormMessage(message, type) {
+    formMessage.textContent = message;
+    formMessage.className = "mt-4 rounded-xl px-4 py-3 text-sm font-bold";
+    formMessage.classList.add(type === "error" ? "bg-red-50" : "bg-emerald-50");
+    formMessage.classList.add(type === "error" ? "text-red-700" : "text-emerald-700");
+  }
+
+  function clearFormMessage() {
+    formMessage.textContent = "";
+    formMessage.className = "mt-4 hidden rounded-xl px-4 py-3 text-sm font-bold";
+  }
+
+  function getEntries() {
+    const rows = [...questionList.querySelectorAll(".question-row")];
+    const entries = [];
+    let hasIncomplete = false;
+
+    rows.forEach((row) => {
+      const answer = normalizeWord(row.querySelector(".answer-input").value);
+      const clue = row.querySelector(".clue-input").value.trim();
+
+      if (!answer && !clue) return;
+      if (!answer || !clue) {
+        hasIncomplete = true;
+        return;
+      }
+      entries.push({ answer, clue, originalIndex: entries.length });
+    });
+
+    return { entries, hasIncomplete };
+  }
+
+  function key(row, col) {
+    return `${row},${col}`;
+  }
+
+  function cellAt(grid, row, col) {
+    return grid.get(key(row, col));
+  }
+
+  function canPlace(word, row, col, direction, grid, requireCross) {
+    const dr = direction === "down" ? 1 : 0;
+    const dc = direction === "across" ? 1 : 0;
+    const before = cellAt(grid, row - dr, col - dc);
+    const after = cellAt(grid, row + dr * word.length, col + dc * word.length);
+
+    if (before || after) return null;
+
+    let crosses = 0;
+    const cells = [];
+
+    for (let i = 0; i < word.length; i++) {
+      const r = row + dr * i;
+      const c = col + dc * i;
+      const existing = cellAt(grid, r, c);
+
+      if (existing) {
+        if (existing.letter !== word[i]) return null;
+        if (existing.direction === direction) return null;
+        crosses++;
+      } else {
+        const sideA = direction === "across" ? cellAt(grid, r - 1, c) : cellAt(grid, r, c - 1);
+        const sideB = direction === "across" ? cellAt(grid, r + 1, c) : cellAt(grid, r, c + 1);
+        if (sideA || sideB) return null;
+      }
+
+      cells.push({ row: r, col: c, letter: word[i] });
+    }
+
+    if (requireCross && crosses === 0) return null;
+    return { row, col, direction, crosses, cells };
+  }
+
+  function placeWord(placement, entry, grid) {
+    placement.cells.forEach((cell) => {
+      const gridKey = key(cell.row, cell.col);
+      const current = grid.get(gridKey);
+      if (current) {
+        current.wordIds.push(entry.id);
+      } else {
+        grid.set(gridKey, { letter: cell.letter, wordIds: [entry.id], direction: placement.direction });
+      }
+    });
+  }
+
+  function getBounds(grid) {
+    const cells = [...grid.keys()].map((item) => item.split(",").map(Number));
+    return {
+      minRow: Math.min(...cells.map(([r]) => r)),
+      maxRow: Math.max(...cells.map(([r]) => r)),
+      minCol: Math.min(...cells.map(([, c]) => c)),
+      maxCol: Math.max(...cells.map(([, c]) => c))
+    };
+  }
+
+  // 既存グリッドのどこかと交差できる配置を探す（うめ言葉のブリッジ探索に利用）
+  function findFillerPlacement(word, grid) {
+    let best = null;
+    grid.forEach((cell, gridKey) => {
+      const [r, c] = gridKey.split(",").map(Number);
+      for (let charIndex = 0; charIndex < word.length; charIndex++) {
+        if (word[charIndex] !== cell.letter) continue;
+        const candidates = [
+          { direction: "across", row: r, col: c - charIndex },
+          { direction: "down", row: r - charIndex, col: c }
+        ];
+        candidates.forEach((candidate) => {
+          const result = canPlace(word, candidate.row, candidate.col, candidate.direction, grid, true);
+          if (result && (!best || result.crosses > best.crosses)) {
+            best = result;
+          }
+        });
+      }
+    });
+    return best;
+  }
+
+  function addToScratch(scratchGrid, placement) {
+    placement.cells.forEach((cell) => {
+      const cellKey = key(cell.row, cell.col);
+      if (!scratchGrid.has(cellKey)) {
+        scratchGrid.set(cellKey, { letter: cell.letter, wordIds: [], direction: placement.direction });
+      }
+    });
+  }
+
+  // 孤立した語を「なじみのある言葉（うめ言葉）」1語でつなげられないか試す（最も交差数が多い候補を採用）
+  function tryBridgeFiller(stalledEntry, grid, usedAnswers, usedFillers) {
+    const letterSet = new Set(stalledEntry.answer.split(""));
+    const candidates = FILLER_WORDS.filter((word) => {
+      if (usedAnswers.has(word) || usedFillers.has(word)) return false;
+      return [...word].some((ch) => letterSet.has(ch));
+    });
+
+    let best = null;
+    for (const word of candidates) {
+      const fillerPlacement = findFillerPlacement(word, grid);
+      if (!fillerPlacement) continue;
+
+      const scratchGrid = new Map(grid);
+      addToScratch(scratchGrid, fillerPlacement);
+
+      const entryPlacement = findFillerPlacement(stalledEntry.answer, scratchGrid);
+      if (!entryPlacement) continue;
+
+      const score = fillerPlacement.crosses + entryPlacement.crosses;
+      if (!best || score > best.score) {
+        best = { fillerWord: word, fillerPlacement, entryPlacement, score };
+      }
+    }
+    return best;
+  }
+
+  // 1語でつながらない場合、うめ言葉を2語つないで橋渡しする（例：グリッド→うめ言葉A→うめ言葉B→孤立語）
+  function tryChainBridgeFiller(stalledEntry, grid, usedAnswers, usedFillers) {
+    const letterSet = new Set(stalledEntry.answer.split(""));
+
+    // 2語目はできるだけ孤立語と直接文字を共有するものを優先して探索範囲を絞る
+    const secondCandidates = FILLER_WORDS.filter((word) => {
+      if (usedAnswers.has(word) || usedFillers.has(word)) return false;
+      return [...word].some((ch) => letterSet.has(ch));
+    });
+    if (!secondCandidates.length) return null;
+
+    const firstCandidates = FILLER_WORDS.filter((word) => !usedAnswers.has(word) && !usedFillers.has(word));
+
+    for (const firstWord of firstCandidates) {
+      const firstPlacement = findFillerPlacement(firstWord, grid);
+      if (!firstPlacement) continue;
+
+      const scratchGrid1 = new Map(grid);
+      addToScratch(scratchGrid1, firstPlacement);
+
+      for (const secondWord of secondCandidates) {
+        if (secondWord === firstWord) continue;
+        const secondPlacement = findFillerPlacement(secondWord, scratchGrid1);
+        if (!secondPlacement) continue;
+
+        const scratchGrid2 = new Map(scratchGrid1);
+        addToScratch(scratchGrid2, secondPlacement);
+
+        const entryPlacement = findFillerPlacement(stalledEntry.answer, scratchGrid2);
+        if (entryPlacement) {
+          return { firstWord, firstPlacement, secondWord, secondPlacement, entryPlacement };
+        }
+      }
+    }
+    return null;
+  }
+
+  function createPuzzle(entries) {
+    const ordered = [...entries]
+      .map((entry, index) => ({ ...entry, id: index + 1 }))
+      .sort((a, b) => b.answer.length - a.answer.length || a.originalIndex - b.originalIndex);
+
+    const usedAnswers = new Set(ordered.map((entry) => entry.answer));
+    const usedFillers = new Set();
+
+    const grid = new Map();
+    const placements = [];
+    const first = ordered[0];
+    const firstPlacement = canPlace(first.answer, 0, 0, "across", grid, false);
+    placeWord(firstPlacement, first, grid);
+    placements.push({ ...firstPlacement, entry: first });
+
+    const pending = ordered.slice(1);
+    let autoFillerId = ordered.length + 1;
+
+    while (pending.length) {
+      let bestCandidate = null;
+      let bestEntryIndex = -1;
+
+      pending.forEach((entry, pendingIndex) => {
+        [...grid.entries()].forEach(([gridKey, cell]) => {
+          const [r, c] = gridKey.split(",").map(Number);
+          for (let charIndex = 0; charIndex < entry.answer.length; charIndex++) {
+            if (entry.answer[charIndex] !== cell.letter) continue;
+
+            const candidates = [
+              { direction: "across", row: r, col: c - charIndex },
+              { direction: "down", row: r - charIndex, col: c }
+            ];
+
+            candidates.forEach((candidate) => {
+              const result = canPlace(entry.answer, candidate.row, candidate.col, candidate.direction, grid, true);
+              if (!result) return;
+
+              const currentBounds = getBounds(grid);
+              const futureRows = result.cells.map((item) => item.row);
+              const futureCols = result.cells.map((item) => item.col);
+              const area =
+                (Math.max(currentBounds.maxRow, ...futureRows) - Math.min(currentBounds.minRow, ...futureRows) + 1) *
+                (Math.max(currentBounds.maxCol, ...futureCols) - Math.min(currentBounds.minCol, ...futureCols) + 1);
+
+              const score = result.crosses * 1000 - area;
+              if (!bestCandidate || score > bestCandidate.score) {
+                bestCandidate = { ...result, score, entry };
+                bestEntryIndex = pendingIndex;
+              }
+            });
+          }
+        });
+      });
+
+      if (bestCandidate) {
+        placeWord(bestCandidate, bestCandidate.entry, grid);
+        placements.push({ ...bestCandidate, entry: bestCandidate.entry });
+        pending.splice(bestEntryIndex, 1);
+        continue;
+      }
+
+      // 通常のクロス相手が見つからない語は、うめ言葉での橋渡しを試みる（まず1語、だめなら2語つないで挑戦）
+      const stalled = pending[0];
+      const bridge = tryBridgeFiller(stalled, grid, usedAnswers, usedFillers);
+
+      if (bridge) {
+        usedFillers.add(bridge.fillerWord);
+        const fillerEntry = {
+          id: autoFillerId++,
+          answer: bridge.fillerWord,
+          clue: bridge.fillerWord,
+          isFiller: true,
+          originalIndex: -1
+        };
+        placeWord(bridge.fillerPlacement, fillerEntry, grid);
+        placements.push({ ...bridge.fillerPlacement, entry: fillerEntry });
+
+        placeWord(bridge.entryPlacement, stalled, grid);
+        placements.push({ ...bridge.entryPlacement, entry: stalled });
+
+        pending.shift();
+        continue;
+      }
+
+      const chainBridge = tryChainBridgeFiller(stalled, grid, usedAnswers, usedFillers);
+      if (chainBridge) {
+        usedFillers.add(chainBridge.firstWord);
+        usedFillers.add(chainBridge.secondWord);
+
+        const firstFillerEntry = {
+          id: autoFillerId++,
+          answer: chainBridge.firstWord,
+          clue: chainBridge.firstWord,
+          isFiller: true,
+          originalIndex: -1
+        };
+        placeWord(chainBridge.firstPlacement, firstFillerEntry, grid);
+        placements.push({ ...chainBridge.firstPlacement, entry: firstFillerEntry });
+
+        const secondFillerEntry = {
+          id: autoFillerId++,
+          answer: chainBridge.secondWord,
+          clue: chainBridge.secondWord,
+          isFiller: true,
+          originalIndex: -1
+        };
+        placeWord(chainBridge.secondPlacement, secondFillerEntry, grid);
+        placements.push({ ...chainBridge.secondPlacement, entry: secondFillerEntry });
+
+        placeWord(chainBridge.entryPlacement, stalled, grid);
+        placements.push({ ...chainBridge.entryPlacement, entry: stalled });
+
+        pending.shift();
+        continue;
+      }
+
+      const entry = pending.shift();
+      const bounds = getBounds(grid);
+      const placement = canPlace(entry.answer, bounds.maxRow + 3, bounds.minCol, "across", grid, false);
+      placeWord(placement, entry, grid);
+      placements.push({ ...placement, entry });
+    }
+
+    const numbered = [...placements].sort((a, b) => a.row - b.row || a.col - b.col || a.direction.localeCompare(b.direction));
+    numbered.forEach((placement, index) => {
+      placement.number = index + 1;
+      placement.entry.number = index + 1;
+    });
+
+    const revealedCells = new Set();
+    placements.forEach((placement) => {
+      if (placement.entry.isFiller) {
+        placement.cells.forEach((cell) => revealedCells.add(key(cell.row, cell.col)));
+      }
+    });
+
+    return { grid, placements, bounds: getBounds(grid), revealedCells };
+  }
+
+  function renderPuzzle(puzzle) {
+    state.grid = puzzle.grid;
+    state.placements = puzzle.placements;
+    state.revealedCells = puzzle.revealedCells;
+    state.minRow = puzzle.bounds.minRow;
+    state.maxRow = puzzle.bounds.maxRow;
+    state.minCol = puzzle.bounds.minCol;
+    state.maxCol = puzzle.bounds.maxCol;
+
+    const rows = state.maxRow - state.minRow + 1;
+    const cols = state.maxCol - state.minCol + 1;
+    crosswordGrid.style.gridTemplateColumns = `repeat(${cols}, 42px)`;
+    crosswordGrid.innerHTML = "";
+    clueList.innerHTML = "";
+    checkResult.className = "mt-4 hidden rounded-xl px-4 py-3 text-sm font-bold";
+
+    const startNumbers = new Map();
+    puzzle.placements.forEach((placement) => {
+      startNumbers.set(key(placement.row, placement.col), placement.number);
+    });
+
+    for (let row = state.minRow; row <= state.maxRow; row++) {
+      for (let col = state.minCol; col <= state.maxCol; col++) {
+        const cell = puzzle.grid.get(key(row, col));
+        if (!cell) {
+          const black = document.createElement("div");
+          black.className = "black-cell";
+          black.setAttribute("aria-hidden", "true");
+          crosswordGrid.appendChild(black);
+          continue;
+        }
+
+        const input = document.createElement("input");
+        input.type = "text";
+        input.maxLength = 1;
+        input.className = "cross-cell";
+        input.dataset.row = row;
+        input.dataset.col = col;
+        input.dataset.answer = cell.letter;
+        input.setAttribute("aria-label", `クロスワード ${row - state.minRow + 1}行 ${col - state.minCol + 1}列`);
+        input.autocomplete = "off";
+
+        const isRevealed = state.revealedCells.has(key(row, col));
+        if (isRevealed) {
+          input.value = cell.letter;
+          input.readOnly = true;
+          input.classList.add("revealed");
+        }
+
+        const number = startNumbers.get(key(row, col));
+        if (number) {
+          const marker = document.createElement("span");
+          marker.className = "cell-number";
+          marker.textContent = number;
+          const holder = document.createElement("div");
+          holder.className = "relative";
+          holder.appendChild(input);
+          holder.appendChild(marker);
+          crosswordGrid.appendChild(holder);
+        } else {
+          crosswordGrid.appendChild(input);
+        }
+
+        input.addEventListener("input", () => {
+          if (input.readOnly) return;
+          input.value = normalizeWord(input.value).slice(0, 1);
+          input.classList.remove("correct", "incorrect");
+          if (input.value) focusNextCell(input);
+        });
+
+        input.addEventListener("keydown", (event) => {
+          const offsets = {
+            ArrowUp: [-1, 0],
+            ArrowDown: [1, 0],
+            ArrowLeft: [0, -1],
+            ArrowRight: [0, 1]
+          };
+          if (offsets[event.key]) {
+            event.preventDefault();
+            focusCell(row + offsets[event.key][0], col + offsets[event.key][1]);
+          }
+          if (event.key === "Backspace" && !input.value && !input.readOnly) {
+            focusPreviousCell(input);
+          }
+        });
+      }
+    }
+
+    puzzle.placements
+      .slice()
+      .sort((a, b) => a.number - b.number)
+      .forEach((placement) => {
+        const isFiller = Boolean(placement.entry.isFiller);
+        const item = document.createElement("li");
+        item.className = `hint-item rounded-r-2xl px-4 py-3 ${isFiller ? "filler-item" : ""}`;
+        item.innerHTML = `
+          <div class="flex items-start gap-3">
+            <span class="flex h-7 min-w-7 items-center justify-center rounded-full ${isFiller ? "bg-[#f2a71b]" : "bg-[#168a88]"} px-2 text-xs font-bold text-white">${placement.number}</span>
+            <div>
+              <p class="text-sm font-bold text-slate-800">${isFiller ? "うめ言葉：" : ""}${escapeHtml(placement.entry.clue)}</p>
+              <p class="mt-1 text-xs text-slate-500">${placement.direction === "across" ? "よこ" : "たて"} ・ ${placement.entry.answer.length}文字${isFiller ? "（つながりを作るため自動で入力済み）" : ""}</p>
+            </div>
+          </div>
+        `;
+        clueList.appendChild(item);
+      });
+
+    if (window.innerWidth <= 640) {
+      crosswordGrid.style.gridTemplateColumns = `repeat(${cols}, 34px)`;
+    }
+  }
+
+  function escapeHtml(value) {
+    return value.replace(/[&<>"']/g, (char) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#039;"
+    }[char]));
+  }
+
+  function focusCell(row, col) {
+    const target = crosswordGrid.querySelector(`.cross-cell[data-row="${row}"][data-col="${col}"]`);
+    if (target) target.focus();
+  }
+
+  function focusNextCell(current) {
+    const allCells = [...crosswordGrid.querySelectorAll(".cross-cell")];
+    const index = allCells.indexOf(current);
+    if (index >= 0 && allCells[index + 1]) allCells[index + 1].focus();
+  }
+
+  function focusPreviousCell(current) {
+    const allCells = [...crosswordGrid.querySelectorAll(".cross-cell")];
+    const index = allCells.indexOf(current);
+    if (index > 0) allCells[index - 1].focus();
+  }
+
+  function showPuzzle() {
+    builderView.classList.add("view-hidden");
+    puzzleView.classList.remove("view-hidden");
+    editButton.classList.remove("view-hidden");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function showBuilder() {
+    puzzleView.classList.add("view-hidden");
+    builderView.classList.remove("view-hidden");
+    editButton.classList.add("view-hidden");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  document.getElementById("crossword-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    clearFormMessage();
+    const { entries, hasIncomplete } = getEntries();
+
+    if (hasIncomplete) {
+      showFormMessage("答えと質問を両方入力してください。", "error");
+      return;
+    }
+    if (!entries.length) {
+      showFormMessage("少なくとも1問、答えと質問を入力してください。", "error");
+      return;
+    }
+    if (entries.some((entry) => entry.answer.length > MAX_ANSWER_LENGTH)) {
+      showFormMessage(`答えは${MAX_ANSWER_LENGTH}文字以内で入力してください。`, "error");
+      return;
+    }
+    if (new Set(entries.map((entry) => entry.answer)).size !== entries.length) {
+      showFormMessage("同じ答えは1回ずつ入力してください。", "error");
+      return;
+    }
+
+    state.entries = entries;
+    renderPuzzle(createPuzzle(entries));
+    showPuzzle();
+  });
+
+  document.getElementById("add-question-button").addEventListener("click", () => {
+    addQuestionRow();
+    const rows = questionList.querySelectorAll(".question-row");
+    rows[rows.length - 1].querySelector(".answer-input").focus();
+  });
+
+  editButton.addEventListener("click", showBuilder);
+
+  // ---- A4用紙1枚に収まるように印刷レイアウトを計算する ----
+  let printStyleEl = null;
+
+  function applyPrintLayout() {
+    if (!puzzleTitleInput.value.trim()) {
+      puzzleTitleInput.value = puzzleTitleInput.placeholder || "クロスワードパズル";
+    }
+
+    const cols = state.maxCol - state.minCol + 1;
+    const rows = state.maxRow - state.minRow + 1;
+    if (!cols || !rows || !Number.isFinite(cols) || !Number.isFinite(rows)) return;
+
+    const marginMM = 10;
+    const portraitW = 210 - marginMM * 2;
+    const portraitH = 297 - marginMM * 2;
+    const landscapeW = 297 - marginMM * 2;
+    const landscapeH = 210 - marginMM * 2;
+
+    // グリッドには用紙の高さの約60%まで、残りを問題一覧にあてる想定でセルサイズを計算する
+    const gridHeightFraction = 0.6;
+    const cluesCount = clueList.children.length || 1;
+    const clueColumns = cluesCount > 8 || cols * rows > 130 ? 3 : 2;
+
+    const portraitCell = Math.min(portraitW / cols, (portraitH * gridHeightFraction) / rows);
+    const landscapeCell = Math.min(landscapeW / cols, (landscapeH * gridHeightFraction) / rows);
+
+    const useLandscape = landscapeCell > portraitCell;
+    const rawCell = useLandscape ? landscapeCell : portraitCell;
+    const cellMM = Math.max(Math.min(rawCell, 11), 4.5);
+
+    document.documentElement.style.setProperty("--print-cell-size", `${cellMM}mm`);
+    document.documentElement.style.setProperty("--print-cols", cols);
+    document.documentElement.style.setProperty("--print-clue-columns", clueColumns);
+
+    if (printStyleEl) printStyleEl.remove();
+    printStyleEl = document.createElement("style");
+    printStyleEl.textContent = `@page { size: A4 ${useLandscape ? "landscape" : "portrait"}; margin: ${marginMM}mm; }`;
+    document.head.appendChild(printStyleEl);
+  }
+
+  window.addEventListener("beforeprint", applyPrintLayout);
+
+  document.getElementById("print-button").addEventListener("click", () => { applyPrintLayout(); window.print(); });
+  document.getElementById("pdf-button").addEventListener("click", () => { applyPrintLayout(); window.print(); });
+
+  document.getElementById("clear-button").addEventListener("click", () => {
+    crosswordGrid.querySelectorAll(".cross-cell").forEach((cell) => {
+      if (cell.readOnly) return;
+      cell.value = "";
+      cell.classList.remove("correct", "incorrect");
+    });
+    checkResult.className = "mt-4 hidden rounded-xl px-4 py-3 text-sm font-bold";
+    const firstCell = crosswordGrid.querySelector(".cross-cell:not(.revealed)");
+    if (firstCell) firstCell.focus();
+  });
+
+  document.getElementById("check-button").addEventListener("click", () => {
+    const cells = [...crosswordGrid.querySelectorAll(".cross-cell")];
+    let correct = 0;
+    let filled = 0;
+
+    cells.forEach((cell) => {
+      if (cell.readOnly) {
+        correct++;
+        filled++;
+        return;
+      }
+      const isFilled = Boolean(cell.value);
+      const isCorrect = cell.value === cell.dataset.answer;
+      cell.classList.remove("correct", "incorrect");
+
+      if (isFilled) {
+        filled++;
+        cell.classList.add(isCorrect ? "correct" : "incorrect");
+      }
+      if (isCorrect) correct++;
+    });
+
+    checkResult.className = "mt-4 rounded-xl bg-[#e8f3f1] px-4 py-3 text-sm font-bold text-[#11605f]";
+    if (correct === cells.length) {
+      checkResult.textContent = "完成！すべて正解です。";
+    } else if (!filled) {
+      checkResult.textContent = "マスに答えを入力してから答え合わせをしてください。";
+    } else {
+      checkResult.textContent = `${cells.length}マス中 ${correct}マス正解です。緑のマスが正解、赤のマスを見直してみましょう。`;
+    }
+  });
+
+  // ---- 言葉セットの保存・呼び出し ----
+  function loadSavedSets() {
+    try {
+      const raw = localStorage.getItem(SAVE_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function persistSavedSets(sets) {
+    localStorage.setItem(SAVE_KEY, JSON.stringify(sets));
+  }
+
+  function refreshSavedSetSelect() {
+    const sets = loadSavedSets();
+    savedSetSelect.innerHTML = "";
+    if (!sets.length) {
+      const opt = document.createElement("option");
+      opt.textContent = "（保存された言葉セットはありません）";
+      opt.value = "";
+      savedSetSelect.appendChild(opt);
+      savedSetSelect.disabled = true;
+      loadSetButton.disabled = true;
+      deleteSetButton.disabled = true;
+    } else {
+      savedSetSelect.disabled = false;
+      loadSetButton.disabled = false;
+      deleteSetButton.disabled = false;
+      sets.forEach((set, index) => {
+        const opt = document.createElement("option");
+        opt.value = String(index);
+        opt.textContent = `${set.name}（${set.entries.length}問）`;
+        savedSetSelect.appendChild(opt);
+      });
+    }
+  }
+
+  saveSetButton.addEventListener("click", () => {
+    const { entries, hasIncomplete } = getEntries();
+    if (hasIncomplete || !entries.length) {
+      showFormMessage("保存する前に、答えと質問をすべて入力してください。", "error");
+      return;
+    }
+    const name = saveSetNameInput.value.trim() || `言葉セット ${new Date().toLocaleString("ja-JP")}`;
+    const sets = loadSavedSets();
+    sets.push({
+      name,
+      entries: entries.map(({ answer, clue }) => ({ answer, clue })),
+      savedAt: Date.now()
+    });
+    persistSavedSets(sets);
+    refreshSavedSetSelect();
+    saveSetNameInput.value = "";
+    showFormMessage(`「${name}」として保存しました。`, "success");
+  });
+
+  loadSetButton.addEventListener("click", () => {
+    const sets = loadSavedSets();
+    const index = Number(savedSetSelect.value);
+    if (Number.isNaN(index) || !sets[index]) return;
+    const set = sets[index];
+    questionList.innerHTML = "";
+    set.entries.forEach((entry) => addQuestionRow(entry));
+    if (!set.entries.length) addQuestionRow();
+    updateQuestionCount();
+    showFormMessage(`「${set.name}」を呼び出しました。`, "success");
+  });
+
+  deleteSetButton.addEventListener("click", () => {
+    const sets = loadSavedSets();
+    const index = Number(savedSetSelect.value);
+    if (Number.isNaN(index) || !sets[index]) return;
+    const name = sets[index].name;
+    sets.splice(index, 1);
+    persistSavedSets(sets);
+    refreshSavedSetSelect();
+    showFormMessage(`「${name}」を削除しました。`, "success");
+  });
+
+  // ---- プリントの題名の記憶 ----
+  try {
+    puzzleTitleInput.value = localStorage.getItem(TITLE_KEY) || "クロスワードパズル";
+  } catch (error) {
+    puzzleTitleInput.value = "クロスワードパズル";
+  }
+  puzzleTitleInput.addEventListener("input", () => {
+    try {
+      localStorage.setItem(TITLE_KEY, puzzleTitleInput.value);
+    } catch (error) {
+      // localStorageが使えない環境では記憶をスキップする
+    }
+  });
+
+  initialRows.forEach(addQuestionRow);
+  refreshSavedSetSelect();
+  lucide.createIcons();
+</script>
+</body>
+</html>
