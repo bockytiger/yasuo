@@ -813,7 +813,10 @@
       placements.push({ ...placement, entry });
     }
 
-    const numbered = [...placements].sort((a, b) => a.row - b.row || a.col - b.col || a.direction.localeCompare(b.direction));
+    // 「うめ言葉」は番号・問題一覧の対象から除外し、答えとなる語だけに番号を振る
+    const numbered = placements
+      .filter((placement) => !placement.entry.isFiller)
+      .sort((a, b) => a.row - b.row || a.col - b.col || a.direction.localeCompare(b.direction));
     numbered.forEach((placement, index) => {
       placement.number = index + 1;
       placement.entry.number = index + 1;
@@ -847,6 +850,7 @@
 
     const startNumbers = new Map();
     puzzle.placements.forEach((placement) => {
+      if (!placement.number) return;
       startNumbers.set(key(placement.row, placement.col), placement.number);
     });
 
@@ -917,19 +921,20 @@
       }
     }
 
+    // 「うめ言葉」は問題一覧に表示しない（マス目には引き続き自動で入力される）
     puzzle.placements
+      .filter((placement) => !placement.entry.isFiller)
       .slice()
       .sort((a, b) => a.number - b.number)
       .forEach((placement) => {
-        const isFiller = Boolean(placement.entry.isFiller);
         const item = document.createElement("li");
-        item.className = `hint-item rounded-r-2xl px-4 py-3 ${isFiller ? "filler-item" : ""}`;
+        item.className = "hint-item rounded-r-2xl px-4 py-3";
         item.innerHTML = `
           <div class="flex items-start gap-3">
-            <span class="flex h-7 min-w-7 items-center justify-center rounded-full ${isFiller ? "bg-[#f2a71b]" : "bg-[#168a88]"} px-2 text-xs font-bold text-white">${placement.number}</span>
+            <span class="flex h-7 min-w-7 items-center justify-center rounded-full bg-[#168a88] px-2 text-xs font-bold text-white">${placement.number}</span>
             <div>
-              <p class="text-sm font-bold text-slate-800">${isFiller ? "うめ言葉：" : ""}${escapeHtml(placement.entry.clue)}</p>
-              <p class="mt-1 text-xs text-slate-500">${placement.direction === "across" ? "よこ" : "たて"} ・ ${placement.entry.answer.length}文字${isFiller ? "（つながりを作るため自動で入力済み）" : ""}</p>
+              <p class="text-sm font-bold text-slate-800">${escapeHtml(placement.entry.clue)}</p>
+              <p class="mt-1 text-xs text-slate-500">${placement.direction === "across" ? "よこ" : "たて"} ・ ${placement.entry.answer.length}文字</p>
             </div>
           </div>
         `;
