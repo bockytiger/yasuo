@@ -1368,16 +1368,22 @@ window.MK = window.MK || {};
    * @param {number} cellSize
    * @param {(row:number, col:number)=>number} toX
    * @param {(row:number, col:number)=>number} toY
+   * @param {number} [boxScale=1] 問題の四角を何倍のサイズで確保するか（六角形モード用）
    * @returns {Set<Cell>} ボックスの範囲に入っている全マスの集合
    */
-  function excavateProblemFootprints(grid, plan, problemDataList, cellSize, toX, toY) {
+  function excavateProblemFootprints(grid, plan, problemDataList, cellSize, toX, toY, boxScale) {
     const trunkSet = new Set(plan.trunkPath);
     const protectedCells = new Set();
+    const scale = boxScale || 1;
 
     plan.placements.forEach((placement, i) => {
       const data = problemDataList[i] || {};
       const optionTexts = [data.correct, data.wrong1, data.wrong2];
-      const { boxW, boxH } = estimateProblemBoxSize(cellSize, data.question, optionTexts, MK.BOX_SIZE_FONT_SCALE);
+      let { boxW, boxH } = estimateProblemBoxSize(cellSize, data.question, optionTexts, MK.BOX_SIZE_FONT_SCALE);
+      // 六角形モードでは、印刷時に四角形モードと同じくらいの大きさに見える
+      // よう、問題の四角を一回り大きく確保しておく（詳細はcomputeHexBoxScaleのコメント参照）。
+      boxW *= scale;
+      boxH *= scale;
       const colHalf = Math.ceil(boxW / cellSize / 2) + 1;
       const rowHalf = Math.ceil(boxH / cellSize / 2) + 1;
 
@@ -1777,6 +1783,10 @@ class MazeRenderer {
     const theme = (renderOptions.theme || '').trim();
     // 迷路の形。'hex' なら六角形セル、それ以外は従来の四角形セルで描画する。
     this.shape = renderOptions.shape === 'hex' ? 'hex' : 'square';
+    // 問題の四角のサイズに掛ける拡大率。六角形モードでは生成時に算出した
+    // 補正値（従来型と印刷時の見た目サイズを揃えるためのもの）が渡ってくる。
+    // 指定がなければ等倍（1）のまま。
+    this.boxScale = renderOptions.boxScale || 1;
     // 問題文・選択肢の文字サイズの倍率（1が標準）。編集画面や迷路画面の
     // 「文字の大きさ」セレクトから渡される。
     const parsedScale = Number(renderOptions.fontScale);
@@ -1815,7 +1825,7 @@ class MazeRenderer {
     // タイトル・テーマを入力した場合は、それぞれの分だけ上部にスペースを確保する。
     const titleHeight = title ? this.cellSize * 1.45 : 0;
     const themeHeight = theme ? this.cellSize * 0.68 : 0;
-    const headerHeight = nameHeight + titleHeight + themeHeight;
+    let headerHeight = nameHeight + titleHeight + themeHeight;
     // ゴールの下に大きめのキャラクター（たこ3号）を表示するための余白。
     const footerHeight = this.cellSize * 1.85;
 
@@ -1824,6 +1834,24 @@ class MazeRenderer {
     // 必要であれば全体の横幅を広げる。
     const tako1Size = this._computeHeaderCharSize(title, titleHeight, nameHeight);
     const tako2Size = tako1Size * 1.5;
+
+    // たこ2号は「なまえ」欄の線を避けるため、_drawHeader側で少し下に
+    // ずらして描画される（詳細は_drawHeader参照）。その分だけ下にある
+    // 迷路のスタート地点（「スタート」マーカー）に被ってしまうことが
+    // あるため、必要であればヘッダーの高さそのものを広げて、たこ2号と
+    // スタートマーカーの間に余白を確保する。
+    const tako2DimsForHeader = this._characterDims(TAKO_CHARACTERS.start, tako2Size);
+    const tako1DimsForHeader = this._characterDims(TAKO_CHARACTERS.title, tako1Size);
+    const tako2CenterY = (title
+      ? nameHeight + titleHeight / 2
+      : Math.max(nameHeight / 2, Math.max(tako1DimsForHeader.h, tako2DimsForHeader.h) / 2 + this.cellSize * 0.05)
+    ) + this.cellSize * 0.4;
+    const tako2Bottom = tako2CenterY + tako2DimsForHeader.h / 2;
+    const minGapBelowTako2 = this.cellSize * 0.25;
+    if (tako2Bottom + minGapBelowTako2 > headerHeight) {
+      headerHeight = tako2Bottom + minGapBelowTako2;
+    }
+
     let width = mazeWidth;
     if (title) {
       const titleTextWidth = this._measureTextWidth(title, TITLE_FONT);
@@ -1871,8 +1899,49 @@ class MazeRenderer {
       );
     }
 
-    (layout.deadEnds || []).forEach((d) => this._drawDeadEnd(svg, d));
-    (layout.problems || []).forEach((p) => this._drawProblemBox(svg, p, grid));
+    // 問題ボックス本体（四角・枠線・問題文・選択肢一覧）を先に描き、
+    // 各問題の出口（ABC）の位置を集めておく。ABCラベル自体はこの時点
+    // ではまだ描かない（行き止まりのデビルマークより後に描いて、常に
+    // 手前に見えるようにするため。詳細は下のコメント参照）。
+    const problemExitInfo = (layout.problems || []).map((p) => {
+      const { exitAnchors, boxRect } = this._drawProblemBox(svg, p, grid);
+      return { p, exitAnchors, boxRect };
+    });
+    const exitLabelCenters = [];
+    const boxRects = [];
+    problemExitInfo.forEach(({ p, exitAnchors, boxRect }) => {
+      p.options.forEach((option) => {
+        const center = this._exitLabelCenter(exitAnchors.get(option.dir));
+        if (center) exitLabelCenters.push(center);
+      });
+      boxRects.push(boxRect);
+    });
+
+    // 行き止まりのデビルマークを描く。誤答枝が短いと、行き止まりが
+    // 問題ボックスのすぐ外（ABCラベルのすぐそば）になることがあり、
+    // デビルの丸やモンスター画像・「いきどまり」の文字がABCラベルと
+    // 重なって紛らわしくなってしまう。そこで、ABCラベルの位置と近すぎる
+    // 行き止まりは描かず、ABCを優先して見やすくする。
+    // また、問題ボックス本体を先に描く関係上（下のコメント参照）、
+    // ボックスのすぐ外側の行き止まりがボックスの上に重なって表示され
+    // ないよう、ボックスに近すぎる行き止まりも同様に描かない。
+    (layout.deadEnds || []).forEach((d) => {
+      const conflictsExitLabel = this._deadEndConflictsWithExitLabel(d, exitLabelCenters);
+      const overlapsBox = boxRects.some((rect) => this._deadEndOverlapsBox(d, rect));
+      if (!conflictsExitLabel && !overlapsBox) {
+        this._drawDeadEnd(svg, d);
+      }
+    });
+
+    // ABCの出口ラベルは最後に描く。行き止まりのデビルマークより必ず
+    // 後（＝手前）に描かれるので、万が一位置が近くてもABCの文字が
+    // 隠れることはない。
+    const LETTERS = ['A', 'B', 'C'];
+    problemExitInfo.forEach(({ p, exitAnchors }) => {
+      p.options.forEach((option, i) => {
+        this._drawExitLabel(svg, exitAnchors.get(option.dir), LETTERS[i]);
+      });
+    });
 
     this.container.innerHTML = '';
     this.container.appendChild(svg);
@@ -2615,12 +2684,14 @@ class MazeRenderer {
     // MK.BOX_SIZE_FONT_SCALE を基準にサイズを見積もっているため、
     // ここで固定サイズにしてもボックスが確保済みの空間からはみ出さない。
     const optionTextsForSize = p.options.map((option) => option.text);
-    const { boxW, boxH } = MK.estimateProblemBoxSize(
+    let { boxW, boxH } = MK.estimateProblemBoxSize(
       this.cellSize,
       p.questionText,
       optionTextsForSize,
       MK.BOX_SIZE_FONT_SCALE
     );
+    boxW *= this.boxScale;
+    boxH *= this.boxScale;
 
     // 文字サイズの倍率。こちらは実際に表示する文字そのものの大きさ・
     // 行の折り返しに使う（ボックスの大きさには影響させない）。
@@ -2703,9 +2774,7 @@ class MazeRenderer {
 
     svg.appendChild(g);
 
-    p.options.forEach((option, i) => {
-      this._drawExitLabel(svg, exitAnchors.get(option.dir), LETTERS[i]);
-    });
+    return { exitAnchors, boxRect: { x, y, boxW, boxH } };
   }
 
   /**
@@ -2920,6 +2989,76 @@ class MazeRenderer {
   }
 
   /**
+  /**
+   * _drawBoxBorder が返した「隙間の座標＋外向きベクトル」から、実際に
+   * ABCラベル（丸）が描かれる中心座標と半径を計算する。_drawExitLabel と
+   * _deadEndConflictsWithExitLabel の両方から同じ式を使うための共通処理。
+   * @param {{x:number,y:number,nx:number,ny:number}|undefined} anchor
+   * @returns {{x:number,y:number,r:number}|null}
+   */
+  _exitLabelCenter(anchor) {
+    if (!anchor) return null;
+    const { x: gapX, y: gapY, nx, ny } = anchor;
+    const r = this.cellSize * 0.32;
+    const edgeGap = this.cellSize * 0.12;
+    const dist = edgeGap + r;
+    return { x: gapX + nx * dist, y: gapY + ny * dist, r };
+  }
+
+  /**
+   * 行き止まりのデビルマークが、いずれかの問題のABC出口ラベルと近すぎて
+   * 紛らわしくならないかを判定する。
+   *
+   * 誤答枝が短いと、行き止まり（デビルマーク）が問題ボックスのすぐ外、
+   * つまりABCラベルのすぐそばになることがある。その場合、デビルの丸や
+   * モンスター画像・「いきどまり」の文字がABCラベルと重なって見づらく
+   * なってしまうため、そのようなデビルマークは描かずにABCを優先する
+   * （render()内の描画順コメントも参照）。
+   *
+   * @param {{cell:Cell}} d 行き止まりの情報
+   * @param {{x:number,y:number,r:number}[]} exitLabelCenters 全問題のABCラベル中心
+   * @returns {boolean}
+   */
+  _deadEndConflictsWithExitLabel(d, exitLabelCenters) {
+    const { toX, toY } = this.pos;
+    const x = toX(d.cell.row, d.cell.col);
+    const y = toY(d.cell.row, d.cell.col);
+    const deadEndR = this.cellSize * 0.36;
+    // 丸い本体だけでなく、下にはみ出す「いきどまり」の文字やモンスター
+    // 画像の分も考慮して、少し余裕を持たせた距離で判定する。
+    const margin = this.cellSize * 0.15;
+    const threshold = deadEndR + margin;
+    return exitLabelCenters.some((c) => Math.hypot(x - c.x, y - c.y) < threshold + c.r);
+  }
+
+  /**
+   * 行き止まりのデビルマークが、問題ボックス本体（四角そのもの）に
+   * めり込んで表示されてしまわないかを判定する。
+   *
+   * render() では問題ボックス本体を先に描いてから行き止まりを描く
+   * 順番にしている（ABCラベルを常に一番手前にするため）。そのため、
+   * 何も対策しないと、ボックスのすぐ外側にある行き止まりの丸や
+   * 「いきどまり」の文字がボックスの上に重なって表示されてしまう
+   * ことがある。これを防ぐため、ボックスの範囲（見た目の半径ぶんの
+   * 余裕を含む）に近い行き止まりも描かないようにする。
+   *
+   * @param {{cell:Cell}} d
+   * @param {{x:number,y:number,boxW:number,boxH:number}} boxRect
+   * @returns {boolean}
+   */
+  _deadEndOverlapsBox(d, boxRect) {
+    const { toX, toY } = this.pos;
+    const x = toX(d.cell.row, d.cell.col);
+    const y = toY(d.cell.row, d.cell.col);
+    // 丸本体・モンスター画像・下の「いきどまり」の文字まで含めた
+    // おおよその見た目の広がり分だけ、ボックスの範囲を広げて判定する。
+    const margin = this.cellSize * 0.55;
+    const halfW = boxRect.boxW / 2 + margin;
+    const halfH = boxRect.boxH / 2 + margin;
+    return Math.abs(x - boxRect.x) < halfW && Math.abs(y - boxRect.y) < halfH;
+  }
+
+  /**
    * 問題ボックスの各出口方向に、A/B/Cの記号だけを配置する。
    * 選択肢の本文は問題ボックスの中に一覧表示されるため、迷路側の
    * 出口には行き先を示す記号（A/B/C）だけを小さく置けばよい。
@@ -2928,17 +3067,10 @@ class MazeRenderer {
    */
   _drawExitLabel(svg, anchor, letter) {
     if (!anchor) return; // 通路の確保に失敗した場合の保険（通常は発生しない）
-    const { x: gapX, y: gapY, nx, ny } = anchor;
-
-    // ラベル本体の半径。文字をくっきり読みやすくする。
-    const r = this.cellSize * 0.32;
-    // ボックスの枠線（隙間）からラベルまでの隙間。ラベルを常にボックスの
-    // すぐそばに留めることで、遠くの通路と紛らわしく重なるのを防ぐ。
-    const edgeGap = this.cellSize * 0.12;
-    const dist = edgeGap + r;
-
-    const x = gapX + nx * dist;
-    const y = gapY + ny * dist;
+    const { x: gapX, y: gapY } = anchor;
+    // ラベルの中心座標・半径は _exitLabelCenter に集約している
+    // （_deadEndConflictsWithExitLabel と同じ式を使うため）。
+    const { x, y, r } = this._exitLabelCenter(anchor);
 
     const g = document.createElementNS(SVG_NS, 'g');
     g.setAttribute('class', 'exit-label-group');
@@ -3314,6 +3446,63 @@ const PROBLEM_EXTRA_MULT_HEX = 2.2; // 四角形は常に1倍
 // 列数だけ少し絞ることで、全体の見た目を縦長寄りに近づけている。
 const COLS_SCALE_HEX = 0.8;
 
+// 印刷CSS（#maze-svg の width/height、@media print）と揃えたA4横1ページの
+// 実寸(mm)。六角形モードの問題の四角のサイズ補正（下記
+// computeHexBoxScale）で、実際に印刷時どれくらい縮小されるかを
+// 見積もるために使う。
+const PRINT_PAGE_WIDTH_MM = 277;
+const PRINT_PAGE_HEIGHT_MM = 190;
+
+/**
+ * 六角形モードの「問題の四角」を、四角形モードと印刷時に同じくらいの
+ * 大きさで見えるようにするための拡大率を計算する。
+ *
+ * 迷路のSVGは印刷時にA4横1ページへ縦横比を保ったまま自動縮小される
+ * （#maze-svg の preserveAspectRatio="xMidYMid meet"）。六角形は同じ
+ * 問題数でも安全な空きマスを確保するために四角形より広い行数・列数が
+ * 必要になるよう調整してある（MAX_GENERATION_ATTEMPTS_HEX等を参照）ため、
+ * 迷路全体の見た目のサイズ（SVGのviewBox）が四角形版より大きくなりがちで、
+ * 結果として印刷時により強く縮小され、問題の四角も一緒に小さく見えてしまう。
+ *
+ * 実際の生成では空きマス確保のため盤面がどこまで広がるかは試行のたびに
+ * 変わる（四角形・六角形どちらも起こりうる）ため、ここでは「growthが
+ * 発生する前の基準盤面」どうしを四角形・六角形で比較し、その構造上の
+ * 縮小率の差だけを問題の四角のサイズに反映する。迷路のマス目自体の
+ * 大きさ（hexRなど）や生成ロジックはここでは一切変えない。
+ *
+ * @param {number} problemCount 問題数
+ * @param {string} difficulty 難易度キー（'small'|'medium'|'large'）
+ * @param {number} cellSize 基準セルサイズ（MK.DEFAULT_CELL_SIZE）
+ * @returns {number} 問題の四角のサイズに掛ける拡大率（1以上）
+ */
+function computeHexBoxScale(problemCount, difficulty, cellSize) {
+  const pad = cellSize * 0.7;
+  const base = BASE_SIZE_BY_DIFFICULTY[difficulty] || BASE_SIZE_BY_DIFFICULTY.medium;
+
+  // 四角形の基準盤面（growth前）
+  const extraSquare = Math.ceil((problemCount / 2) * 1); // 四角形のPROBLEM_EXTRA_MULTは常に1倍
+  const squareWidth = (base.cols + extraSquare) * cellSize + pad * 2;
+  const squareHeight = (base.rows + extraSquare) * cellSize + pad * 2;
+
+  // 六角形の基準盤面（growth前。_handleGenerateのrows/cols計算と同じ式）
+  const extraHex = Math.ceil((problemCount / 2) * PROBLEM_EXTRA_MULT_HEX);
+  const hexRows = base.rows + extraHex;
+  const hexColsRaw = base.cols + extraHex;
+  const hexCols = Math.max(4, Math.round(hexColsRaw * COLS_SCALE_HEX));
+  const hexR = cellSize * 0.62;
+  const colStep = hexR * Math.sqrt(3);
+  const rowStep = hexR * 1.5;
+  const hexWidth = colStep * (hexCols + 0.5) + pad * 2;
+  const hexHeight = rowStep * Math.max(hexRows - 1, 0) + hexR * 2 + pad * 2;
+
+  const squareScale = Math.min(PRINT_PAGE_WIDTH_MM / squareWidth, PRINT_PAGE_HEIGHT_MM / squareHeight);
+  const hexScale = Math.min(PRINT_PAGE_WIDTH_MM / hexWidth, PRINT_PAGE_HEIGHT_MM / hexHeight);
+
+  // 六角形の方がより強く縮小される分だけ、問題の四角を大きくして相殺する。
+  // 極端な値にならないようクランプする。
+  return Math.min(1.4, Math.max(1, squareScale / hexScale));
+}
+
 /**
  * 難易度ごとのループ辺の密度（0〜1）。
  * 値が低いほど「木」に近い構造になり、正解・誤答の分岐とは無関係な
@@ -3430,6 +3619,7 @@ class MazeApp {
       bgTheme: state.bgTheme,
       fontScale: state.fontScale,
       monsterImage: state.monsterImage,
+      boxScale: result.boxScale,
     };
     // 迷路画面側の「文字の大きさ」を後から変えても迷路を作り直さずに
     // 再描画できるよう、生成結果とレンダリング条件を保持しておく。
@@ -3437,6 +3627,7 @@ class MazeApp {
     this._lastLayout = result.layout;
     this._lastRenderOptions = {
       title: state.title, theme: state.theme, shape, bgTheme: state.bgTheme, monsterImage: state.monsterImage,
+      boxScale: result.boxScale,
     };
 
     this.renderer.render(result.grid, result.layout, renderOptions);
@@ -3469,6 +3660,11 @@ class MazeApp {
     // 判定する必要があるため、迷路の形に応じた簡易な座標変換を用意する
     // （絶対位置は使わないので、レンダラー側のpad等のオフセットは省略できる）。
     const cellSize = MK.DEFAULT_CELL_SIZE;
+    // 六角形モードだけ、問題の四角が印刷時に四角形版と同じくらいの
+    // 大きさに見えるよう拡大率を計算する（詳細はcomputeHexBoxScaleのコメント参照）。
+    const boxScale = MK.mazeShape === 'hex'
+      ? computeHexBoxScale(problemDataList.length, difficulty, cellSize)
+      : 1;
     let cellPos;
     if (MK.mazeShape === 'hex') {
       const hexR = cellSize * 0.62;
@@ -3485,7 +3681,7 @@ class MazeApp {
       };
     }
     const protectedCells = MK.excavateProblemFootprints(
-      grid, plan, problemDataList, cellSize, cellPos.toX, cellPos.toY
+      grid, plan, problemDataList, cellSize, cellPos.toX, cellPos.toY, boxScale
     );
 
     const problemsLayout = [];
@@ -3530,7 +3726,9 @@ class MazeApp {
     // ときの実際の見た目の大きさまでは考慮できないため）。
     const boxFootprints = problemsLayout.map((p) => {
       const optionTexts = p.options.map((o) => o.text);
-      const { boxW, boxH } = MK.estimateProblemBoxSize(cellSize, p.questionText, optionTexts, MK.BOX_SIZE_FONT_SCALE);
+      let { boxW, boxH } = MK.estimateProblemBoxSize(cellSize, p.questionText, optionTexts, MK.BOX_SIZE_FONT_SCALE);
+      boxW *= boxScale;
+      boxH *= boxScale;
       return {
         cx: cellPos.toX(p.cell.row, p.cell.col),
         cy: cellPos.toY(p.cell.row, p.cell.col),
@@ -3556,6 +3754,7 @@ class MazeApp {
         problems: problemsLayout,
         deadEnds: deadEndsLayout,
       },
+      boxScale,
     };
   }
 
