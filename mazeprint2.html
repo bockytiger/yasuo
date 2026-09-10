@@ -483,10 +483,10 @@ body {
     <label class="toolbar-item">
       文字の大きさ:
       <select id="font-scale-select">
-        <option value="0.8">小</option>
-        <option value="1" selected>中</option>
-        <option value="1.2">大</option>
-        <option value="1.4">特大</option>
+        <option value="1.2">小</option>
+        <option value="1.4" selected>中</option>
+        <option value="1.6">大</option>
+        <option value="1.8">特大</option>
       </select>
     </label>
 
@@ -537,10 +537,10 @@ body {
     <label class="toolbar-item" style="margin-left:auto;">
       問題文の文字の大きさ:
       <select id="maze-font-scale-select">
-        <option value="0.8">小</option>
-        <option value="1" selected>中</option>
-        <option value="1.2">大</option>
-        <option value="1.4">特大</option>
+        <option value="1.2">小</option>
+        <option value="1.4" selected>中</option>
+        <option value="1.6">大</option>
+        <option value="1.8">特大</option>
       </select>
     </label>
   </div>
@@ -662,6 +662,10 @@ window.MK = window.MK || {};
        * @type {Cell|null}
        */
       this.branchOwner = null;
+      /** true の場合、本道（スタートからゴールまでの主経路）上のマス。
+       * renderer.js が問題ボックスの出口をたどる際、分岐点で本道を
+       * 見失わないようにするために使う。 */
+      this.isTrunk = false;
     }
 
     /** 双方向に通路をつなげる */
@@ -1012,9 +1016,18 @@ window.MK = window.MK || {};
    * @param {number} problemCount
    * @returns {{trunkPath:Cell[], placements:Array<{cell:Cell,index:number,correctDir:string,branches:Array<{dir:string,child:Cell}>}>}|null}
    */
-  function planProblemPlacements(grid, start, goal, problemCount) {
+  function planProblemPlacements(grid, start, goal, problemCount, minMonsterDistSqOverride) {
+    const minMonsterDistSq = typeof minMonsterDistSqOverride === 'number' ? minMonsterDistSqOverride : MIN_MONSTER_DIST_SQ;
     const trunkPath = computeTrunkPath(grid, start, goal);
     if (!trunkPath) return null;
+    // 本道（トランクパス）上の各マスに印を付けておく。ボックスの見た目の
+    // 範囲が本道の複数マスにまたがる場合、renderer.js側で「正解方向の
+    // 出口がどこか」をたどる際、本道上のマスが分岐点になっていることが
+    // あり、単純に「最初に見つかったリンク」をたどるだけでは誤って
+    // 枝道の方へ迷い込んでしまうことがある（「正解を選んでもゴールに
+    // つながらない」不具合の原因）。この印を使って、renderer.js側が
+    // 本道を優先してたどれるようにする。
+    trunkPath.forEach((cell) => { cell.isTrunk = true; });
     if (problemCount === 0) return { trunkPath, placements: [] };
 
     // 内部セル（グリッドの外周に接していない）だけを候補にする。
@@ -1100,7 +1113,7 @@ window.MK = window.MK || {};
           subtreeSet,
           maxExtend
         );
-        if (reachableDistSq < MIN_MONSTER_DIST_SQ) {
+        if (reachableDistSq < minMonsterDistSq) {
           reservedSoFar.forEach((c) => {
             c.reserved = false;
             c.branchOwner = null;
@@ -1295,7 +1308,7 @@ window.MK = window.MK || {};
   // あるという指摘への対応）、ボックスのサイズ計算だけは常にこの値
   // （選べる中で一番大きい「特大」相当）を基準にする。文字そのものの
   // 大きさは別途 fontScale に応じて変わる。
-  MK.BOX_SIZE_FONT_SCALE = 1.4;
+  MK.BOX_SIZE_FONT_SCALE = 1.8;
 
   /**
    * 問題ボックスが実際にどれくらいの大きさで描画されるかを見積もる。
@@ -1311,9 +1324,12 @@ window.MK = window.MK || {};
    */
   function estimateProblemBoxSize(cellSize, questionText, optionTexts, fontScale) {
     const scale = fontScale || 1;
-    const boxW = cellSize * 5.1;
+    // ボックスをできる限り大きくしてほしいという要望に合わせて、以前より
+    // 幅を広げている（5.1倍 → 5.6倍）。1行あたりの文字数の基準値も、
+    // 広げた幅に合わせて比例して増やしてある（22→24, 25→27）。
+    const boxW = cellSize * 5.6;
 
-    const qCharsPerLine = Math.max(8, Math.round(22 / scale));
+    const qCharsPerLine = Math.max(8, Math.round(24 / scale));
     const qLineHeight = 26 * scale;
     const qParagraphs = String(questionText || '').split('\n');
     let qLines = 0;
@@ -1321,7 +1337,7 @@ window.MK = window.MK || {};
       qLines += Math.max(1, Math.ceil(para.length / qCharsPerLine));
     });
 
-    const optCharsPerLine = Math.max(8, Math.round(25 / scale));
+    const optCharsPerLine = Math.max(8, Math.round(27 / scale));
     const optLineHeight = 23 * scale;
     let optLineCount = 0;
     (optionTexts || []).forEach((text) => {
@@ -1329,11 +1345,11 @@ window.MK = window.MK || {};
       optLineCount += Math.max(1, Math.ceil(withLabel.length / optCharsPerLine));
     });
 
-    const topPad = 22;
-    const dividerGap = 18;
-    const bottomPad = 18;
+    const topPad = 24;
+    const dividerGap = 20;
+    const bottomPad = 20;
     const boxH = Math.max(
-      cellSize * 2.6,
+      cellSize * 2.9,
       topPad + qLines * qLineHeight + dividerGap + optLineCount * optLineHeight + bottomPad
     );
     return { boxW, boxH };
@@ -1517,36 +1533,168 @@ class ClusterMazeGenerator {
    */
   addLoopEdges(density, segmentMap, protectedCells) {
     const grid = this.grid;
-    const candidates = [];
+    const clampedDensity = Math.max(0, Math.min(1, density));
+
+    // マス目全体からランダムに選ぶのではなく、盤面をいくつかの小さな
+    // ブロックに分け、ブロックごとに同じ割合だけ開通させる。
+    // 完全にランダムな一括抽選だと、たまたま同じ地域に開通が集中して
+    // 「壁のほとんどない大きな部屋」のように見えてしまったり、逆に
+    // ある地域だけ壁だらけになったりする（印刷して見たときに
+    // 「スカスカな場所とギチギチな場所のムラが目立つ」原因）。
+    // ブロック単位で密度をそろえることで、盤面全体の見た目の密度を
+    // 均一に近づける。
+    const BLOCK_SIZE = 5;
+    const blocks = new Map(); // "blockRow,blockCol" -> candidates[]
+    const blockFreeCells = new Map(); // "blockRow,blockCol" -> そのブロックの実マス数
     for (const cell of grid.allCells()) {
       if (!cell.isFree()) continue;
       if (protectedCells && protectedCells.has(cell)) continue;
+      const blockKey = `${Math.floor(cell.row / BLOCK_SIZE)},${Math.floor(cell.col / BLOCK_SIZE)}`;
+      blockFreeCells.set(blockKey, (blockFreeCells.get(blockKey) || 0) + 1);
       for (const { dir, cell: n } of grid.neighborsOf(cell)) {
         if (!n.isFree()) continue;
         if (protectedCells && protectedCells.has(n)) continue;
         if (cell.hasLink(dir)) continue;
         if (segmentMap && segmentMap.get(cell) !== segmentMap.get(n)) continue;
-        candidates.push({ a: cell, b: n, dir });
+        let bucket = blocks.get(blockKey);
+        if (!bucket) {
+          bucket = [];
+          blocks.set(blockKey, bucket);
+        }
+        bucket.push({ a: cell, b: n, dir });
       }
     }
 
-    const clampedDensity = Math.max(0, Math.min(1, density));
-    const count = Math.round(candidates.length * clampedDensity);
+    // ブロックごとの開通本数は、そのブロック「内の候補数」の割合ではなく、
+    // 「マス数あたりの開通本数」という共通の基準（面積あたりの密度）で決める。
+    // 候補数の割合で配分すると、問題から離れて区間分割されていない広い区画
+    // （候補となる壁が大量にある）に開通が集中し、大きな空室ができてしまう。
+    // 基準となる「マスあたり候補数」は、各ブロックの候補密度の中央値を使う。
+    // 単純な全体平均だと、候補が極端に多い外れ値の区画に基準そのものが
+    // 引っぱられてしまうため、中央値を使って外れ値の影響を抑える。
+    // なお、あぶれた予算を他ブロックへ回すような再配分は行わない
+    // （それをすると、結局は候補の多い区画に開通が逆流して集中してしまう）。
+    const blockKeys = Array.from(blocks.keys());
+    const perCellRatios = [];
+    for (const key of blockKeys) {
+      const freeCells = blockFreeCells.get(key) || 0;
+      if (freeCells > 0) perCellRatios.push(blocks.get(key).length / freeCells);
+    }
+    perCellRatios.sort((a, b) => a - b);
+    const medianPerCell = perCellRatios.length > 0
+      ? perCellRatios[Math.floor(perCellRatios.length / 2)]
+      : 0;
+    const targetPerCell = medianPerCell * clampedDensity;
 
-    const shuffled = shuffleArray(candidates);
+    const blockBudget = new Map();
+    for (const key of blockKeys) {
+      const freeCells = blockFreeCells.get(key) || 0;
+      const raw = Math.round(freeCells * targetPerCell);
+      blockBudget.set(key, Math.min(raw, blocks.get(key).length));
+    }
+
     const usedPairs = new Set();
     let added = 0;
-    for (const cand of shuffled) {
-      if (added >= count) break;
-      const keyA = `${cand.a.row},${cand.a.col}-${cand.b.row},${cand.b.col}`;
-      const keyB = `${cand.b.row},${cand.b.col}-${cand.a.row},${cand.a.col}`;
-      if (usedPairs.has(keyA) || usedPairs.has(keyB)) continue;
-      if (cand.a.hasLink(cand.dir)) continue;
-      cand.a.link(cand.dir, cand.b);
-      usedPairs.add(keyA);
-      added++;
+    const addedEdges = []; // { a, b } - 後で「大きな空室」を間引くために使う
+    for (const [key, blockCandidates] of blocks) {
+      const blockCount = blockBudget.get(key) || 0;
+      const shuffled = shuffleArray(blockCandidates);
+      let addedInBlock = 0;
+      for (const cand of shuffled) {
+        if (addedInBlock >= blockCount) break;
+        const keyA = `${cand.a.row},${cand.a.col}-${cand.b.row},${cand.b.col}`;
+        const keyB = `${cand.b.row},${cand.b.col}-${cand.a.row},${cand.a.col}`;
+        if (usedPairs.has(keyA) || usedPairs.has(keyB)) continue;
+        if (cand.a.hasLink(cand.dir)) continue;
+        cand.a.link(cand.dir, cand.b);
+        usedPairs.add(keyA);
+        addedEdges.push({ a: cand.a, b: cand.b });
+        added++;
+        addedInBlock++;
+      }
     }
+
+    // ブロック単位で密度をそろえても、区間（segment）そのものが広い範囲に
+    // またがっている場合は、その区間全体が均等に開通しすぎて「壁がほぼ無い
+    // 大きな部屋」ができてしまうことがある（面積配分だけでは解決しない）。
+    // そこで最後に、実際にできあがった迷路を見て「隣接マス全てとつながって
+    // いる（壁が1枚も無い）マス」の塊を探し、大きすぎる塊があれば、
+    // その塊の中で今追加したループ辺（元の木の辺ではない）を間引いて分割する。
+    // ループ辺は木の辺に対して常に冗長なので、間引いても迷路の連結性
+    // （スタート・ゴール・各問題への到達可能性）は絶対に壊れない。
+    added -= this._pruneOversizedRooms(added > 0 ? addedEdges : [], protectedCells);
     return added;
+  }
+
+  /**
+   * 「壁が完全に無いマス」（実際に存在する隣接マス全てとつながっているマス）
+   * の連結した塊を探し、規定サイズを超える塊があれば、その塊の内部にある
+   * 追加済みループ辺（addedEdges）を優先的に取り除いて塊を分割する。
+   * @returns {number} 実際に取り除いた辺の数
+   */
+  _pruneOversizedRooms(addedEdges, protectedCells) {
+    if (addedEdges.length === 0) return 0;
+    const grid = this.grid;
+    const MAX_ROOM_SIZE = 10;
+    const addedSet = new Set();
+    const edgeKey = (a, b) => a.row < b.row || (a.row === b.row && a.col < b.col)
+      ? `${a.row},${a.col}-${b.row},${b.col}`
+      : `${b.row},${b.col}-${a.row},${a.col}`;
+    addedEdges.forEach(({ a, b }) => addedSet.add(edgeKey(a, b)));
+
+    const isRoomCell = (cell) => {
+      if (!cell.isFree()) return false;
+      if (protectedCells && protectedCells.has(cell)) return false;
+      const neighbors = grid.neighborsOf(cell).filter(({ cell: n }) => n.isFree() && !(protectedCells && protectedCells.has(n)));
+      return neighbors.length > 0 && cell.links.size >= neighbors.length;
+    };
+
+    let removedTotal = 0;
+    let dirty = true;
+    let guard = 0;
+    while (dirty && guard < 200) {
+      dirty = false;
+      guard++;
+      const visited = new Set();
+      for (const cell of grid.allCells()) {
+        if (visited.has(cell) || !isRoomCell(cell)) continue;
+        const component = [];
+        const stack = [cell];
+        visited.add(cell);
+        while (stack.length) {
+          const c = stack.pop();
+          component.push(c);
+          for (const [, n] of c.links) {
+            if (!visited.has(n) && isRoomCell(n)) {
+              visited.add(n);
+              stack.push(n);
+            }
+          }
+        }
+        if (component.length <= MAX_ROOM_SIZE) continue;
+
+        // この塊の内部にある「追加済みループ辺」を探し、間引く。
+        const componentSet = new Set(component);
+        const internalAddedEdges = [];
+        component.forEach((c) => {
+          for (const [dir, n] of c.links) {
+            if (!componentSet.has(n)) continue;
+            if (n.row < c.row || (n.row === c.row && n.col < c.col)) continue; // 重複回避
+            if (addedSet.has(edgeKey(c, n))) internalAddedEdges.push({ a: c, b: n });
+          }
+        });
+        if (internalAddedEdges.length === 0) continue;
+
+        const toRemove = shuffleArray(internalAddedEdges).slice(0, Math.max(1, Math.ceil(internalAddedEdges.length * 0.4)));
+        toRemove.forEach(({ a, b }) => {
+          a.unlinkTo(b);
+          addedSet.delete(edgeKey(a, b));
+          removedTotal++;
+        });
+        dirty = true;
+      }
+    }
+    return removedTotal;
   }
 }
 
@@ -1790,7 +1938,7 @@ class MazeRenderer {
     // 問題文・選択肢の文字サイズの倍率（1が標準）。編集画面や迷路画面の
     // 「文字の大きさ」セレクトから渡される。
     const parsedScale = Number(renderOptions.fontScale);
-    this.fontScale = Number.isFinite(parsedScale) && parsedScale > 0 ? parsedScale : 1;
+    this.fontScale = Number.isFinite(parsedScale) && parsedScale > 0 ? parsedScale : 1.4;
 
     // 行き止まりに表示するモンスター（デビル）画像。オリジナル画像が
     // アップロードされていればそれを、なければ既定のイラストを使う。
@@ -1937,9 +2085,84 @@ class MazeRenderer {
     // 後（＝手前）に描かれるので、万が一位置が近くてもABCの文字が
     // 隠れることはない。
     const LETTERS = ['A', 'B', 'C'];
-    problemExitInfo.forEach(({ p, exitAnchors }) => {
+    problemExitInfo.forEach(({ p, exitAnchors, boxRect }) => {
+      // A/B/Cのラベル同士が近すぎて重なってしまうことがある（特に六角形は
+      // 出口が斜め方向にもあるため、実際の出口位置同士が偶然近くなる
+      // ことがある）。ラベルを描く前に、実際に描かれる位置同士の距離を
+      // 確認し、近すぎる場合は壁に沿う方向へ少しずつ離す（実際の出口＝
+      // 壁の隙間の位置そのものは変えず、ラベルの表示位置だけを調整する）。
+      const labelR = this.cellSize * 0.32;
+      const labelEdgeGap = this.cellSize * 0.12;
+      const labelDist = labelEdgeGap + labelR;
+      const labelHaloR = labelR + 4;
+      const minLabelDist = labelHaloR * 2 + 2;
+
+      const letterEntries = p.options.map((option, i) => ({
+        letter: LETTERS[i],
+        anchor: exitAnchors.get(option.dir),
+      }));
+      const tangentShiftFor = letterEntries.map(() => 0);
+      const labelPos = (entry, shift) => {
+        const a = entry.anchor;
+        if (!a) return null;
+        const tx = -a.ny;
+        const ty = a.nx;
+        return {
+          x: a.x + a.nx * labelDist + tx * shift,
+          y: a.y + a.ny * labelDist + ty * shift,
+        };
+      };
+      // ラベルを壁沿いにずらして重なりを避ける際、ずらしすぎるとボックスの
+      // 角を越えて隣の辺の壁のすぐそばまで入り込み、「ABCの表記が壁に
+      // ぶつかってどちらへ進めばいいか分からない」ように見えてしまう。
+      // そのため、ラベルの中心が常にボックスの角から一定以上離れた
+      // 自分の辺の範囲内に収まるよう、シフト量そのものを制限する。
+      const halfW = boxRect.boxW / 2;
+      const halfH = boxRect.boxH / 2;
+      const cornerMargin = labelHaloR + 2;
+      const clampShiftToOwnSide = (entry, shift) => {
+        const a = entry.anchor;
+        if (!a) return shift;
+        const tx = -a.ny;
+        const ty = a.nx;
+        if (Math.abs(tx) > 0.5) {
+          const posX = a.x + a.nx * labelDist + tx * shift;
+          const minX = boxRect.x - halfW + cornerMargin;
+          const maxX = boxRect.x + halfW - cornerMargin;
+          const clampedX = Math.max(minX, Math.min(maxX, posX));
+          return (clampedX - a.x - a.nx * labelDist) / tx;
+        }
+        if (Math.abs(ty) > 0.5) {
+          const posY = a.y + a.ny * labelDist + ty * shift;
+          const minY = boxRect.y - halfH + cornerMargin;
+          const maxY = boxRect.y + halfH - cornerMargin;
+          const clampedY = Math.max(minY, Math.min(maxY, posY));
+          return (clampedY - a.y - a.ny * labelDist) / ty;
+        }
+        return shift;
+      };
+      for (let iter = 0; iter < 6; iter++) {
+        for (let i = 0; i < letterEntries.length; i++) {
+          for (let j = i + 1; j < letterEntries.length; j++) {
+            if (!letterEntries[i].anchor || !letterEntries[j].anchor) continue;
+            const pa = labelPos(letterEntries[i], tangentShiftFor[i]);
+            const pb = labelPos(letterEntries[j], tangentShiftFor[j]);
+            const dx = pb.x - pa.x;
+            const dy = pb.y - pa.y;
+            const d = Math.sqrt(dx * dx + dy * dy);
+            if (d < minLabelDist) {
+              const push = d > 0.01 ? (minLabelDist - d) / 2 + 1 : minLabelDist / 2;
+              tangentShiftFor[i] -= push;
+              tangentShiftFor[j] += push;
+              tangentShiftFor[i] = clampShiftToOwnSide(letterEntries[i], tangentShiftFor[i]);
+              tangentShiftFor[j] = clampShiftToOwnSide(letterEntries[j], tangentShiftFor[j]);
+            }
+          }
+        }
+      }
+
       p.options.forEach((option, i) => {
-        this._drawExitLabel(svg, exitAnchors.get(option.dir), LETTERS[i]);
+        this._drawExitLabel(svg, exitAnchors.get(option.dir), LETTERS[i], tangentShiftFor[i]);
       });
     });
 
@@ -2699,16 +2922,16 @@ class MazeRenderer {
     const qFontSize = 19 * fontScale;
     const optFontSize = 17 * fontScale;
 
-    const qCharsPerLine = Math.max(8, Math.round(22 / fontScale));
+    const qCharsPerLine = Math.max(8, Math.round(24 / fontScale));
     const qLineHeight = 26 * fontScale;
     const qLines = wrapTextLines(p.questionText, qCharsPerLine);
 
-    const optCharsPerLine = Math.max(8, Math.round(25 / fontScale));
+    const optCharsPerLine = Math.max(8, Math.round(27 / fontScale));
     const optLineHeight = 23 * fontScale;
     const optionLineGroups = p.options.map((option, i) => wrapTextLines(LETTERS[i] + '. ' + option.text, optCharsPerLine));
 
-    const topPad = 22;
-    const dividerGap = 18;
+    const topPad = 24;
+    const dividerGap = 20;
 
     const g = document.createElementNS(SVG_NS, 'g');
     g.setAttribute('class', 'problem-box');
@@ -2896,11 +3119,19 @@ class MazeRenderer {
       }
 
       // 近すぎる通過点（同じ隙間に収まる距離）は1つの隙間にまとめる。
+      // ただし、この問題自身のA/B/C（起点セルの異なる方向）同士は、
+      // どんなに近くても絶対に同じ隙間にまとめない。まとめてしまうと
+      // 2つの異なる答えが同じ1つの隙間・同じ位置にラベルされてしまい、
+      // 「ABCがダブる／同じ道にある」ように見える不具合になるため。
       const minSpacing = gapSize * 0.9;
       const groups = [];
       crossings.forEach((cr) => {
         const last = groups[groups.length - 1];
-        if (last && cr.t - last.t < minSpacing) {
+        const crIsOwnOption = cr.cell === originCell;
+        const conflictsWithOwnOption = crIsOwnOption && last && last.members.some(
+          (m) => m.cell === originCell && m.dir !== cr.dir
+        );
+        if (last && !conflictsWithOwnOption && cr.t - last.t < minSpacing) {
           last.members.push(cr);
           last.t = (last.t * (last.members.length - 1) + cr.t) / last.members.length;
         } else {
@@ -2960,12 +3191,28 @@ class MazeRenderer {
           anchors.set(dir, { x: gx, y: gy, nx, ny });
           break;
         }
-        // 来た方向以外の唯一のリンクをたどって奥へ進む。
+        // 来た方向以外のリンクをたどって奥へ進む。次のマスが分岐点
+        // （本道以外の枝も伸びている、など）になっている場合、単純に
+        // 最初に見つかったリンクを使うと、正解なのに本道から逸れて
+        // 誤答枝や無関係な支線に迷い込んでしまうことがある
+        // （「正解を選んでもゴールにつながらない」不具合の原因）。
+        // そのため、今いるマスと同じ「陣地」（本道なら本道、特定の
+        // 誤答枝ならその誤答枝）を保つ候補を優先してたどる。
         let foundDir = null;
+        const candidates = [];
         for (const [d, linked] of next.links) {
           if (linked === current) continue;
-          foundDir = d;
-          break;
+          candidates.push([d, linked]);
+        }
+        if (candidates.length === 1) {
+          foundDir = candidates[0][0];
+        } else if (candidates.length > 1) {
+          const sameTerritory = candidates.find(([, linked]) => (
+            next.reserved
+              ? linked.reserved && linked.branchOwner === next.branchOwner
+              : linked.isTrunk
+          ));
+          foundDir = (sameTerritory || candidates[0])[0];
         }
         if (!foundDir) break;
         current = next;
@@ -2975,14 +3222,31 @@ class MazeRenderer {
 
     // ごくまれに、誤答枝がボックスの見た目の範囲内で行き止まりになって
     // しまい（枝がボックスより短い場合）、外へ出る地点自体が存在しない
-    // ことがある。この場合だけは、ボックスのその方向の辺の中央を
+    // ことがある。この場合だけは、ボックスのその方向の辺の中の位置を
     // フォールバックのアンカーとして使う（ラベルを描かないよりはよい）。
+    //
+    // 注意: 六角形はNE/NWが同じ辺(N)に、SE/SWが同じ辺(S)に割り当たる
+    // ため、単純に辺の「中央」を使うと、この2方向が両方ともフォール
+    // バックになったときに全く同じ座標になり、2つのABCラベルが重なって
+    // しまう（「答えがダブる」不具合の原因）。これを避けるため、方向
+    // ごとに辺の中央からずらした位置を使う。
+    const HEX_FALLBACK_FRAC = { NE: 0.7, NW: 0.3, SE: 0.7, SW: 0.3 };
+    const fallbackSideUsage = {};
     (optionDirs || []).forEach((dir) => {
       if (anchors.has(dir)) return;
       const side = HEX_TO_RECT_SIDE[dir] || dir;
       const [[sx1, sy1], [sx2, sy2]] = sides[side] || [[x, y], [x, y]];
       const [nx, ny] = NORMALS[side] || [0, 0];
-      anchors.set(dir, { x: (sx1 + sx2) / 2, y: (sy1 + sy2) / 2, nx, ny });
+      let frac = HEX_FALLBACK_FRAC[dir] !== undefined ? HEX_FALLBACK_FRAC[dir] : 0.5;
+      // 上のNE/NW/SE/SWの振り分けだけでは防ぎきれない残りのケース
+      // （同じ辺に3つ目がフォールバックする等）に備えた保険。
+      const usedCount = fallbackSideUsage[side] || 0;
+      fallbackSideUsage[side] = usedCount + 1;
+      if (usedCount > 0) {
+        const shift = 0.18 * Math.ceil(usedCount / 2) * (usedCount % 2 === 1 ? 1 : -1);
+        frac = Math.max(0.12, Math.min(0.88, frac + shift));
+      }
+      anchors.set(dir, { x: sx1 + (sx2 - sx1) * frac, y: sy1 + (sy2 - sy1) * frac, nx, ny });
     });
 
     return anchors;
@@ -3064,13 +3328,27 @@ class MazeRenderer {
    * 出口には行き先を示す記号（A/B/C）だけを小さく置けばよい。
    * 位置は _drawBoxBorder が返した「実際に開けた隙間」の座標を
    * そのまま使うため、壁の隙間とラベルが必ず一致する。
+   *
+   * @param {number} [tangentShift] 隙間から見て壁に沿う方向（法線と
+   *   直角の方向）へのずらし量。同じ問題の別のA/B/Cラベルとどうしても
+   *   近づきすぎてしまう場合に、render() 側で計算して渡す
+   *   （0なら通常通り隙間の真上に配置される）。
    */
-  _drawExitLabel(svg, anchor, letter) {
+  _drawExitLabel(svg, anchor, letter, tangentShift) {
     if (!anchor) return; // 通路の確保に失敗した場合の保険（通常は発生しない）
-    const { x: gapX, y: gapY } = anchor;
+    const { nx, ny } = anchor;
     // ラベルの中心座標・半径は _exitLabelCenter に集約している
     // （_deadEndConflictsWithExitLabel と同じ式を使うため）。
-    const { x, y, r } = this._exitLabelCenter(anchor);
+    const base = this._exitLabelCenter(anchor);
+    const gapX = anchor.x;
+    const gapY = anchor.y;
+    // 法線と直角な「壁に沿う」方向の単位ベクトル。
+    const tx = -ny;
+    const ty = nx;
+    const shift = tangentShift || 0;
+    const x = base.x + tx * shift;
+    const y = base.y + ty * shift;
+    const r = base.r;
 
     const g = document.createElementNS(SVG_NS, 'g');
     g.setAttribute('class', 'exit-label-group');
@@ -3433,12 +3711,15 @@ const BASE_SIZE_BY_DIFFICULTY = {
 // 抜け道ができてしまう不具合の根本修正）。この影響で1問あたりが
 // 使う予約マスが増え、後の問題ほど配置できる空きマスが見つかりにくく
 // なったため、以前より少し試行回数と盤面の広がりに余裕を持たせている。
-const MAX_GENERATION_ATTEMPTS = 28;
+// 問題ボックスの外側にはみ出すABCラベルの分まで重なり判定に含めるように
+// したため（最終安全確認その2）、配置がやり直しになる頻度が以前より
+// 少し増えている。取りこぼしなく収まるよう試行回数に余裕を持たせている。
+const MAX_GENERATION_ATTEMPTS = 40;
 // 六角形は1マスあたりの分岐が多い分、正解＋誤答2つ分の安全な空きを確保
 // できる配置が四角形より見つかりにくく、同じ盤面サイズでは問題数を
 // 多く入れにくい。そのため六角形のときだけ試行回数を増やし、盤面の
 // 広がり方も大きくして、10問程度までは無理なく収まるようにしている。
-const MAX_GENERATION_ATTEMPTS_HEX = 32;
+const MAX_GENERATION_ATTEMPTS_HEX = 44;
 const GRID_GROWTH_STEP_HEX = 3; // 四角形は2ずつ広げる（下のgrowth計算を参照）
 const PROBLEM_EXTRA_MULT_HEX = 2.2; // 四角形は常に1倍
 // 六角形は「東西の目の詰まり方」が縦方向のセル間隔より広いため、行数・列数を
@@ -3517,11 +3798,15 @@ function computeHexBoxScale(problemCount, difficulty, cellSize) {
  * この密度は各問題の区間（segmentMap）内でしか辺を追加しないため、
  * 値を上げても正解を選ばないと先の区間へは進めない、という迷路として
  * のルールには影響しない。
+ *
+ * addLoopEdges をブロック単位の中央値ベースの密度に変更したことに
+ * 合わせて、値もその方式向けに調整してある（以前の全体一括抽選方式の
+ * ときの値のままだと、スカスカな迷路になりやすかったため）。
  */
 const LOOP_DENSITY_BY_DIFFICULTY = {
-  small: 0.55,
-  medium: 0.6,
-  large: 0.65,
+  small: 0.75,
+  medium: 0.8,
+  large: 0.85,
 };
 
 /**
@@ -3561,7 +3846,7 @@ class MazeApp {
    */
   _handleFontScaleChange() {
     if (!this._lastGrid || !this._lastLayout || !this.mazeFontScaleSelect) return;
-    const fontScale = parseFloat(this.mazeFontScaleSelect.value) || 1;
+    const fontScale = parseFloat(this.mazeFontScaleSelect.value) || 1.4;
     this.renderer.render(this._lastGrid, this._lastLayout, {
       ...this._lastRenderOptions,
       fontScale,
@@ -3632,7 +3917,7 @@ class MazeApp {
 
     this.renderer.render(result.grid, result.layout, renderOptions);
     if (this.mazeFontScaleSelect) {
-      this.mazeFontScaleSelect.value = String(state.fontScale || 1);
+      this.mazeFontScaleSelect.value = String(state.fontScale || 1.4);
     }
     this.showMaze();
   }
@@ -3651,7 +3936,29 @@ class MazeApp {
     const generator = new ClusterMazeGenerator(grid);
     generator.generateSpanningTree();
 
-    const plan = planProblemPlacements(grid, start, goal, problemDataList.length);
+    // 誤答枝の行き止まり（モンスター）は、問題ボックスの外にはっきり
+    // 出た場所に置きたい。ボックスの大きさは問題文・選択肢の長さによって
+    // かなり変わるため、この時点では「平均的な大きさ」から必要な距離の
+    // 目安を計算しておく（探索時の足切り用）。一番長い問題文1つに合わせて
+    // 全問題の必要距離を決めてしまうと、盤面が必要以上に大きくなり、
+    // 印刷時にすべてが縮小されて文字やボックスが小さく見えてしまうため、
+    // ここでは平均値を使い、個々の問題ごとの正確な確認は後段
+    // （最終安全確認）でボックスの実サイズを使って行う。
+    const cellSizeForDist = MK.DEFAULT_CELL_SIZE;
+    let totalHalfDiagCells = 0;
+    problemDataList.forEach((data) => {
+      const optionTexts = [data.correct, data.wrong1, data.wrong2];
+      const { boxW, boxH } = MK.estimateProblemBoxSize(cellSizeForDist, data.question, optionTexts, MK.BOX_SIZE_FONT_SCALE);
+      const halfDiagCells = Math.sqrt((boxW / 2) ** 2 + (boxH / 2) ** 2) / cellSizeForDist;
+      totalHalfDiagCells += halfDiagCells;
+    });
+    const avgHalfDiagCells = totalHalfDiagCells / Math.max(1, problemDataList.length);
+    // 箱の外にちゃんと出た上で、さらに少し歩いた実感を持たせるための余白。
+    const MONSTER_DIST_MARGIN_CELLS = 1.5;
+    const requiredDistCells = avgHalfDiagCells + MONSTER_DIST_MARGIN_CELLS;
+    const minMonsterDistSq = requiredDistCells * requiredDistCells;
+
+    const plan = planProblemPlacements(grid, start, goal, problemDataList.length, minMonsterDistSq);
     if (!plan) return null;
 
     // 問題ボックスの見た目の範囲に隠れる無関係なマスを、ループ辺を追加する
@@ -3724,6 +4031,14 @@ class MazeApp {
     // 見積もったボックス同士が重なってしまう配置は、この時点でやり直す
     // （MIN_GRID_DIST等のマス目単位の間隔だけでは、長文の問題が並んだ
     // ときの実際の見た目の大きさまでは考慮できないため）。
+    // ボックスの矩形どうしだけでなく、その外側にはみ出すABCラベル
+    // （丸＋下敷きの halo）の分の余白も考慮しないと、片方のボックスの
+    // ラベルがもう片方のボックスの中に入り込んでしまうことがある
+    // （「Cがとなりの問題とぶつかって道に見えない」不具合の原因）。
+    const labelR = cellSize * 0.32;
+    const labelEdgeGap = cellSize * 0.12;
+    const labelHaloR = labelR + 4;
+    const LABEL_MARGIN = labelEdgeGap + labelR + labelHaloR;
     const boxFootprints = problemsLayout.map((p) => {
       const optionTexts = p.options.map((o) => o.text);
       let { boxW, boxH } = MK.estimateProblemBoxSize(cellSize, p.questionText, optionTexts, MK.BOX_SIZE_FONT_SCALE);
@@ -3740,8 +4055,8 @@ class MazeApp {
       for (let j = i + 1; j < boxFootprints.length; j++) {
         const a = boxFootprints[i];
         const b = boxFootprints[j];
-        const dx = Math.abs(a.cx - b.cx) - (a.boxW / 2 + b.boxW / 2);
-        const dy = Math.abs(a.cy - b.cy) - (a.boxH / 2 + b.boxH / 2);
+        const dx = Math.abs(a.cx - b.cx) - (a.boxW / 2 + b.boxW / 2 + LABEL_MARGIN);
+        const dy = Math.abs(a.cy - b.cy) - (a.boxH / 2 + b.boxH / 2 + LABEL_MARGIN);
         if (dx < 0 && dy < 0) return null; // 重なる恐れがあるので、この配置はやり直す
       }
     }
