@@ -4,6 +4,29 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>3D迷路 学習アプリ</title>
+<script>
+/* 見はり役：プログラムが最後まで読みこめなかったとき、青い画面のままにせず理由を表示する */
+(function(){
+  var errs = [];
+  window.addEventListener('error', function(e){
+    errs.push((e && e.message ? e.message : 'エラー') + (e && e.lineno ? '（' + e.lineno + '行目）' : ''));
+  });
+  window.addEventListener('load', function(){
+    setTimeout(function(){
+      if(window.__mazeReady) return;
+      var box = document.createElement('div');
+      box.setAttribute('style','position:fixed;inset:0;z-index:9999;background:#fffdf6;color:#3a2a1a;padding:28px 22px;font-size:17px;line-height:1.8;overflow:auto;font-family:sans-serif');
+      box.innerHTML = '<h2 style="margin:0 0 10px;color:#c2561b">⚠ アプリを よみこめませんでした</h2>'
+        + '<p style="margin:0 0 10px">GASでつかっている場合、<b>index の中身が とちゅうまでしか貼り付けられていない</b>ことが いちばん多い原因です。</p>'
+        + '<ol style="margin:0 0 10px;padding-left:1.4em"><li>GASの <b>index.html</b> を開き、いちばん下が <code>&lt;/html&gt;</code> で終わっているか確かめてください。</li>'
+        + '<li>ちがうときは、アプリの「GAS配布用に保存」から もう一度 ぜんぶコピーして貼り付け、💾保存してください。</li>'
+        + '<li>そのあと「デプロイを管理」→ ✏ →「新バージョン」→「デプロイ」を押してください（押さないと古いままです）。</li></ol>'
+        + (errs.length ? '<p style="margin:0;font-size:14px;color:#888">くわしい情報：' + errs.slice(0,3).join(' / ').replace(/</g,'&lt;') + '</p>' : '');
+      document.body.appendChild(box);
+    }, 1200);
+  });
+})();
+</script>
 <style>
 :root{
   --ink:#3a2a1a; --gold:#ffc83d; --orange:#ff8a3d; --pink:#f59fc1; --green:#35b36f;
@@ -442,33 +465,40 @@ button{font-family:inherit;cursor:pointer}
 
     <div class="gasStep"><div class="no">2</div><div class="body">
       <code>コード.gs</code> の中身をぜんぶ消して、これを貼り付けます。
-      <textarea class="gasCode" id="gasCodeGs" rows="8" readonly></textarea>
+      <textarea class="gasCode" id="gasCodeGs" rows="8" readonly=""></textarea>
       <div class="gasBtns"><button class="btn btn-blue" id="gasCopyGs">📋 コード.gs をコピー</button><span class="copied hidden" id="gasCopiedGs">✓ コピーしました</span></div>
     </div></div>
 
     <div class="gasStep"><div class="no">3</div><div class="body">
       左の「ファイル ＋」→「<b>HTML</b>」をえらび、名前を <code>index</code> にします（「.html」は自動でつきます）。<br>
-      中身をぜんぶ消して、これを貼り付けます。<small>（とても長いので、はじめの部分だけ表示しています）</small>
-      <textarea class="gasCode" id="gasIndex" rows="3" readonly></textarea>
+      中身をぜんぶ消して、これを貼り付けます。<small>（とても長いですが、下の欄に <b>ぜんぶ</b> 入っています）</small>
+      <textarea class="gasCode" id="gasIndex" rows="5" readonly=""></textarea>
       <div class="gasBtns">
         <button class="btn btn-blue" id="gasCopyIdx">📋 index をコピー</button><span class="copied hidden" id="gasCopiedIdx">✓ コピーしました</span>
-        <button class="btn btn-gray" id="gasDlIdx">⬇ index.html をダウンロード（コピーがうまくいかないとき）</button>
+        <button class="btn btn-gray" id="gasSelIdx">🔲 ぜんぶ選択（そのあと Ctrl＋C）</button>
+        <button class="btn btn-gray" id="gasDlIdx">⬇ index.html をダウンロード</button>
       </div>
-      <div style="margin-top:6px">貼り付けたら、上の 💾（保存）ボタンを押します。</div>
+      <div class="gasTip" style="margin-top:8px">
+        ✅ <b>貼り付けたら確認：</b>GASの index.html の <b>いちばん下</b>が <code>&lt;/html&gt;</code> で終わっていればOK。<br>
+        　文字数のめやす：<b id="gasIdxLen"></b>文字。とちゅうで切れていると、青い画面だけになります。<br>
+        💾 貼り付けたら、上の 保存ボタンを押します。
+      </div>
     </div></div>
 
     <div class="gasStep"><div class="no">4</div><div class="body">
       右上の「<b>デプロイ → 新しいデプロイ</b>」→ 歯車 ⚙ から「<b>ウェブアプリ</b>」をえらび、次のように設定して「デプロイ」を押します。
       <div class="gasSet">次のユーザーとして実行：<b>自分</b></div>
       <div class="gasSet">アクセスできるユーザー：<b>（学校のドメイン）内の全員</b></div>
-      はじめてのときは「アクセスを承認」の画面が出るので、ご自分のアカウントで許可してください。
+      はじめてのときは「アクセスを承認」の画面が出るので、ご自分のアカウントで許可してください。<br>
+      <small>※「（学校のドメイン）内の全員」は、<b>学校のGoogleアカウント</b>でGASを作ったときだけ出ます。家の個人Gmailで作ると、子どもの学校アカウントから開けないことがあります。</small>
     </div></div>
 
     <div class="gasStep"><div class="no">5</div><div class="body">
       表示された「ウェブアプリ」のURL（<code>…/exec</code> でおわるもの）をコピーして、Classroomの課題や資料に「<b>リンク</b>」として貼れば完成です。
       <div class="gasTip">
         💡 子どもは リンクを押すだけで あそべます。はじめに「はじめる！」を押すと、キーボードが効くようになります。<br>
-        🔁 問題を直したときは、<code>index</code> を貼りかえて保存 →「デプロイを管理」→ ✏ →「バージョン：<b>新バージョン</b>」→「デプロイ」。URLはそのまま使えます。<br>
+        🔁 問題を直したときは、<code>index</code> を貼りかえて保存 →「デプロイを管理」→ ✏ →「バージョン：<b>新バージョン</b>」→「デプロイ」。URLはそのまま使えます。<b>新バージョンにしないと、古い（こわれた）ままのページが出つづけます。</b><br>
+        🧪 うまく出ないときは、Chromeの<b>シークレットウィンドウ</b>で、学校アカウントだけでログインして開いてみてください。<br>
         📚 問題セットごとにURLを分けたいときは、GASプロジェクトをセットごとに作ってください。
       </div>
     </div></div>
@@ -670,7 +700,7 @@ function saveChildFile(){
 function gasCodeFor(q){
   const title = (q.title || '3D迷路');
   return [
-    '// 3D迷路 学習アプリ（' + title.replace(/[\r\n]/g,' ') + '）',
+    '/' + '/ 3D迷路 学習アプリ（' + title.replace(/[\r\n]/g,' ') + '）',  // GASは文字列の中の「スラッシュ2つ」以降を消してしまうため、分けて書く
     'function doGet() {',
     "  return HtmlService.createHtmlOutputFromFile('index')",
     '    .setTitle(' + JSON.stringify(title) + ')',
@@ -681,7 +711,7 @@ function gasCodeFor(q){
 }
 async function copyText(text, okId){
   let ok = false;
-  try { await navigator.clipboard.writeText(text); ok = true; } catch(e){}
+  try { if(navigator.clipboard && window.isSecureContext){ await navigator.clipboard.writeText(text); ok = true; } } catch(e){}
   if(!ok){
     const ta = document.createElement('textarea'); ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
     document.body.appendChild(ta); ta.select();
@@ -703,7 +733,8 @@ function openGas(){
   if(errs.length){ edMsg('GAS配布用に保存する前に、次のところを入力してください。<br>' + errs.map(esc).join('<br>')); return; }
   gasHtml = buildChildHtml(q); gasGs = gasCodeFor(q);
   $('gasCodeGs').value = gasGs;
-  $('gasIndex').value = gasHtml.slice(0, 400) + '\n…（つづきは「コピー」で ぜんぶ コピーされます）';
+  $('gasIndex').value = gasHtml;
+  $('gasIdxLen').textContent = gasHtml.length.toLocaleString();
   $('gasProjName').textContent = '「' + (q.title || '3D迷路') + '」';
   $('gasModal').classList.remove('hidden');
 }
@@ -1310,6 +1341,7 @@ $('gasClose').onclick = ()=> $('gasModal').classList.add('hidden');
 $('gasCopyGs').onclick = ()=> copyText(gasGs, 'gasCopiedGs');
 $('gasCopyIdx').onclick = ()=> copyText(gasHtml, 'gasCopiedIdx');
 $('gasDlIdx').onclick = ()=> downloadText(gasHtml, 'index.html');
+$('gasSelIdx').onclick = ()=> { const t = $('gasIndex'); t.focus(); t.select(); t.setSelectionRange(0, t.value.length); };
 
 /* ====================== はじまり ====================== */
 buildEditor();
@@ -1320,6 +1352,7 @@ if(EMBEDDED && EMBEDDED.questions){
   fillEditor(d && d.questions ? d : sampleQuiz());
   show('editorScreen');
 }
+window.__mazeReady = true;
 </script>
 </body>
 </html>
