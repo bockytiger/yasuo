@@ -128,6 +128,30 @@ button{font-family:inherit;cursor:pointer}
 .gasSet{background:#fff;border:2px solid #eadfca;border-radius:10px;padding:6px 12px;margin:4px 0;font-size:14px}
 .gasSet b{color:#c2561b}
 .gasTip{background:#eef6ff;border-radius:10px;padding:8px 12px;font-size:14px;line-height:1.7;margin-top:6px}
+/* 画像 */
+.imgRow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0 2px}
+.imgBtn{background:#fff4e2;border:2px dashed #e3b07a;color:#8a4f1e;border-radius:10px;padding:6px 12px;font-size:14px;font-weight:bold}
+.imgBtn:hover{background:#ffe9c9}
+.imgPrev{display:none;position:relative;border:2px solid #e2d8c4;border-radius:10px;padding:4px;background:#fff;margin-top:4px}
+.imgPrev.on{display:inline-block}
+.imgPrev img{display:block;max-width:100%;max-height:140px;border-radius:6px}
+.imgDel{position:absolute;top:-10px;right:-10px;width:28px;height:28px;border-radius:50%;border:none;background:#e05050;color:#fff;font-weight:bold;font-size:15px;box-shadow:0 2px 4px rgba(0,0,0,.3)}
+.imgHint{font-size:12px;color:#9a8a74}
+.qCard.drop{border-color:var(--orange);background:#fff8ee}
+.quizImg{display:block;max-width:100%;max-height:30vh;margin:0 auto 12px;border-radius:12px;border:3px solid #e8dcc6;background:#fff;cursor:zoom-in}
+.quizCard.hasImg{max-width:940px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);column-gap:20px;align-items:center}
+.quizCard.hasImg .quizDoor{grid-column:1 / -1;justify-self:start}
+.quizCard.hasImg .quizImg{grid-column:1;grid-row:2 / span 3;max-height:min(46vh,380px);margin:0 auto;align-self:center}
+.quizCard.hasImg .quizQ,.quizCard.hasImg .quizChoices,.quizCard.hasImg .quizHint{grid-column:2}
+.quizCard.hasImg .quizQ{font-size:clamp(18px,2.2vw,26px);margin-bottom:10px}
+.quizCard.hasImg .qc{padding:8px 12px}
+.quizCard.hasImg .quizHint{display:none}
+@media (max-width:700px){ .quizCard.hasImg{display:block} .quizCard.hasImg .quizImg{max-height:26vh;margin-bottom:10px} }
+.rqImg{display:block;max-width:100%;max-height:170px;margin:0 0 8px;border-radius:10px;border:2px solid #e8dcc6;background:#fff;cursor:zoom-in}
+.zoomBox{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:80;display:flex;align-items:center;justify-content:center;padding:16px;cursor:zoom-out}
+.zoomBox img{max-width:100%;max-height:100%;border-radius:10px;background:#fff}
+.edIO{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}
+.edIO .btn{font-size:15px;padding:8px 14px}
 .edNote{font-size:14px;color:#6b5a48;line-height:1.8;background:#fff8e6;border-radius:12px;padding:10px 14px;margin-top:16px}
 
 /* ---------- title ---------- */
@@ -157,6 +181,7 @@ button{font-family:inherit;cursor:pointer}
 .rq.compact .rqItem{padding-top:6px;padding-bottom:8px}
 .rq.compact .rqText{font-size:18px;margin:2px 0 6px}
 .rq.compact .rqc{padding:5px 12px;font-size:17px}
+.rq.compact .rqImg{max-height:130px}
 .rq.compact .stamp{width:58px;height:58px;margin-top:-29px;border-width:6px}
 .chip.next{background:var(--orange);color:#fff;border-color:#ffd0a8;animation:pulse 1s infinite}
 .chip.done{background:var(--green);color:#fff;border-color:#a8efc7}
@@ -183,7 +208,7 @@ button{font-family:inherit;cursor:pointer}
 /* quiz modal (only covers the maze) */
 .quizModal{position:absolute;inset:0;background:rgba(10,12,30,.62);display:flex;align-items:center;justify-content:center;padding:4%;animation:fadeIn .25s}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
-.quizCard{background:var(--paper);color:var(--ink);border-radius:20px;width:100%;max-width:760px;padding:22px 26px 18px;border:6px solid #c9632f;box-shadow:0 12px 30px rgba(0,0,0,.5);animation:cardIn .35s cubic-bezier(.2,1.4,.4,1)}
+.quizCard{max-height:100%;overflow:auto;background:var(--paper);color:var(--ink);border-radius:20px;width:100%;max-width:760px;padding:22px 26px 18px;border:6px solid #c9632f;box-shadow:0 12px 30px rgba(0,0,0,.5);animation:cardIn .35s cubic-bezier(.2,1.4,.4,1)}
 @keyframes cardIn{from{transform:scale(.7);opacity:0}to{transform:scale(1);opacity:1}}
 .quizDoor{display:inline-block;background:#c9632f;color:#fff;font-weight:bold;border-radius:10px;padding:3px 14px;font-size:18px;margin-bottom:10px}
 .quizQ{font-size:clamp(20px,2.6vw,30px);font-weight:bold;line-height:1.5;margin-bottom:16px;white-space:pre-wrap;word-break:break-word}
@@ -325,10 +350,17 @@ button{font-family:inherit;cursor:pointer}
         <label class="chk"><input type="checkbox" id="edShuffle" checked="">選択肢の順番を毎回シャッフルする</label>
       </div>
     </div>
+    <div class="edIO">
+      <button class="btn btn-blue" id="edJsonSave">📄 JSONで保存（問題データ）</button>
+      <button class="btn btn-gray" id="edJsonLoad">📂 JSONを読みこむ</button>
+      <input type="file" id="edJsonFile" accept=".json,application/json" class="hidden">
+    </div>
     <div id="qCards" class="qCards"></div>
     <div id="editorMsg" class="edMsg hidden"></div>
     <p class="edNote">
       ・入力内容はこのブラウザに自動で一時保存されます。<br>
+      ・「📄 JSONで保存」すると、問題データ（画像もふくむ）だけを小さなファイルで残せます。「📂 JSONを読みこむ」で、いつでも続きから編集できます。6問版のJSONも読みこめます。<br>
+      ・画像は「🖼 画像をつける」のほか、カードへのドラッグ＆ドロップや、問題文の欄で Ctrl＋V（貼り付け）でもつけられます。大きい画像は自動で小さくします。<br>
       ・「保存」でできる子ども用ファイルは、それだけで動きます（インターネット不要）。共有フォルダやTeams・Classroomで配れます。<br>
       ・問題を直したいときは、保存したファイルを開き、はじめの画面の右下「先生用」から編集して、もう一度保存してください。
     </p>
@@ -381,6 +413,7 @@ button{font-family:inherit;cursor:pointer}
         <div id="quizModal" class="quizModal hidden">
           <div class="quizCard">
             <div class="quizDoor" id="quizDoor"></div>
+            <img class="quizImg hidden" id="quizImg" alt="問題の画像">
             <div class="quizQ" id="quizQ"></div>
             <div class="quizChoices" id="quizChoices"></div>
             <div class="quizHint">ただしい こたえを えらぶと とびらが ひらくよ（<span class="k">1</span><span class="k">2</span><span class="k">3</span> キーでも えらべます）</div>
@@ -526,6 +559,7 @@ button{font-family:inherit;cursor:pointer}
   </div>
 </div>
 
+<div id="zoomBox" class="zoomBox hidden"><img id="zoomImg" alt=""></div>
 <canvas id="confetti"></canvas>
 
 <script id="quizData" type="application/json">null</script>
@@ -641,7 +675,8 @@ function syncCards(){
       q: card.querySelector('.qText').value.trim(),
       choices: [...card.querySelectorAll('.chInput')].map(el=>el.value.trim()),
       answer: r ? parseInt(r.value,10) : -1,
-      comment: card.querySelector('.cmInput').value.trim()
+      comment: card.querySelector('.cmInput').value.trim(),
+      img: edImgs[i] || ''
     };
   });
 }
@@ -655,6 +690,7 @@ function renderCards(){
     card.querySelectorAll('input[type=radio]').forEach((el,j)=> el.checked = (d.answer === j));
     card.querySelector('.cmInput').value = d.comment || '';
     card.classList.remove('err');
+    edImgs[i] = d.img || ''; showCardImg(i);
   });
 }
 function buildEditor(){
@@ -667,15 +703,109 @@ function buildEditor(){
       `<div class="qHead"><span class="qNum">${NUMS[i]}</span> のとびらの問題</div>
        <label class="fl">問題文</label>
        <textarea class="qText" rows="2" placeholder="例：7 × 8 は いくつ？"></textarea>
+       <div class="imgRow"><button type="button" class="imgBtn">🖼 画像をつける</button><span class="imgHint">（なくてもOK）</span><input type="file" accept="image/*" class="imgFile hidden"></div>
+       <div class="imgPrev"><img alt="問題の画像"><button type="button" class="imgDel" title="画像をとる">✕</button></div>
        <div class="fl">選択肢 <small>（正解の ◉ をえらんでください）</small></div>
        ${[0,1,2].map(j=>`<div class="chRow"><label class="radio"><input type="radio" name="ans${i}" value="${j}"><span>${LABELS[j]}</span></label><input type="text" class="chInput" placeholder="選択肢${LABELS[j]}"></div>`).join('')}
        <label class="fl">正解したときのひとこと <small>（なくてもOK・プルプくんが言います）</small></label>
        <input type="text" class="cmInput" placeholder="例：九九の 7のだん、ばっちりだね！">`;
     wrap.appendChild(card);
+    setupImageCard(card, i);
   }
   $('editorScreen').addEventListener('input', saveDraftSoon);
   $('editorScreen').addEventListener('change', saveDraftSoon);
 }
+/* ---------- 問題の画像 ---------- */
+let edImgs = Array(MAXQ).fill('');
+function showCardImg(i){
+  const card = document.querySelectorAll('.qCard')[i]; if(!card) return;
+  const box = card.querySelector('.imgPrev');
+  box.classList.toggle('on', !!edImgs[i]);
+  box.querySelector('img').src = edImgs[i] || '';
+  card.querySelector('.imgBtn').textContent = edImgs[i] ? '🖼 画像をかえる' : '🖼 画像をつける';
+}
+function shrinkImage(file){
+  return new Promise((resolve, reject)=>{
+    if(!file || !/^image\//.test(file.type)){ reject(new Error('画像ではありません')); return; }
+    const fr = new FileReader();
+    fr.onerror = ()=> reject(new Error('読みこめませんでした'));
+    fr.onload = ()=>{
+      const img = new Image();
+      img.onerror = ()=> reject(new Error('この画像は読みこめませんでした'));
+      img.onload = ()=>{
+        const MAX = 900;
+        const sc = Math.min(1, MAX / Math.max(img.naturalWidth, img.naturalHeight));
+        const w = Math.max(1, Math.round(img.naturalWidth*sc)), h = Math.max(1, Math.round(img.naturalHeight*sc));
+        // 小さいPNG（図・イラスト）はそのまま。ほかは縮小してJPEGに
+        if(sc === 1 && file.type === 'image/png' && file.size < 250000){ resolve(fr.result); return; }
+        if(sc === 1 && file.size < 150000 && file.type !== 'image/png'){ resolve(fr.result); return; }
+        const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+        const c = cv.getContext('2d'); c.fillStyle = '#fff'; c.fillRect(0,0,w,h); c.drawImage(img,0,0,w,h);
+        resolve(cv.toDataURL('image/jpeg', 0.85));
+      };
+      img.src = fr.result;
+    };
+    fr.readAsDataURL(file);
+  });
+}
+async function attachImage(i, file){
+  try{
+    edImgs[i] = await shrinkImage(file);
+    showCardImg(i); saveDraftSoon();
+    $('editorMsg').classList.add('hidden');
+  }catch(e){ edMsg(`${NUMS[i]}：${esc(e.message)}`); }
+}
+function setupImageCard(card, i){
+  const fileIn = card.querySelector('.imgFile');
+  card.querySelector('.imgBtn').onclick = ()=> fileIn.click();
+  fileIn.onchange = ()=>{ if(fileIn.files[0]) attachImage(i, fileIn.files[0]); fileIn.value=''; };
+  card.querySelector('.imgDel').onclick = ()=>{ edImgs[i] = ''; showCardImg(i); saveDraftSoon(); };
+  card.addEventListener('dragover', e=>{ e.preventDefault(); card.classList.add('drop'); });
+  card.addEventListener('dragleave', ()=> card.classList.remove('drop'));
+  card.addEventListener('drop', e=>{
+    e.preventDefault(); card.classList.remove('drop');
+    const f = [...(e.dataTransfer.files||[])].find(f=>/^image\//.test(f.type));
+    if(f) attachImage(i, f);
+  });
+  card.addEventListener('paste', e=>{
+    const it = [...((e.clipboardData && e.clipboardData.items) || [])].find(x=>x.kind==='file' && /^image\//.test(x.type));
+    if(it){ e.preventDefault(); attachImage(i, it.getAsFile()); }
+  });
+}
+
+/* ---------- JSON 保存・読みこみ ---------- */
+function saveJson(){
+  const q = readEditor();
+  const data = { app:'3D迷路学習アプリ', format:1, savedAt:new Date().toISOString(), quiz:q };
+  const name = ((q.title || '3D迷路').replace(/[\\/:*?"<>|\s]+/g,'_')) + '_問題データ.json';
+  const blob = new Blob([JSON.stringify(data, null, 1)], {type:'application/json'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href), 3000);
+  edMsg(`「${esc(name)}」を保存しました。「📂 JSONを読みこむ」で、いつでも この問題を よびだせます。`, true);
+}
+function loadJsonFile(file){
+  const fr = new FileReader();
+  fr.onload = ()=>{
+    let d;
+    try { d = JSON.parse(fr.result); } catch(e){ edMsg('JSONファイルを読みこめませんでした。ファイルがこわれていないか確かめてください。'); return; }
+    const q = d && d.quiz ? d.quiz : d;
+    if(!q || !Array.isArray(q.questions)){ edMsg('この3D迷路の問題データではないようです。'); return; }
+    const total = q.questions.length;
+    const extra = total > MAXQ ? `<br>※ このデータには ${total}問 入っています。はじめの${MAXQ}問を読みこみました。`
+                : total < 10 ? `<br>※ このデータは ${total}問 です。この版は10問からなので、のこりの問題を入力してください。` : '';
+    const clean = { title: String(q.title||''), size: q.size, minimap: q.minimap, shuffle: q.shuffle,
+      count: Math.min(MAXQ, Math.max(10, total)),
+      questions: q.questions.slice(0,MAXQ).map(x=>({
+        q: String((x&&x.q)||''), choices: [0,1,2].map(j=> String(((x&&x.choices)||[])[j]||'')),
+        answer: [0,1,2].includes(x&&x.answer) ? x.answer : -1, comment: String((x&&x.comment)||''),
+        img: (x && typeof x.img === 'string' && /^data:image\//.test(x.img)) ? x.img : '' })) };
+    if(![21,25,31].includes(clean.size)) clean.size = 25;
+    fillEditor(clean); saveDraftSoon();
+    edMsg(`「${esc(file.name)}」を読みこみました。${extra}`, true);
+  };
+  fr.readAsText(file);
+}
+
 function fillEditor(q){
   $('edTitle').value = q.title || '';
   $('edSize').value = String(q.size || 25);
@@ -698,7 +828,7 @@ function validate(q){
   document.querySelectorAll('.qCard').forEach(c=>c.classList.remove('err'));
   q.questions.forEach((d,i)=>{
     const p = [];
-    if(!d.q) p.push('問題文');
+    if(!d.q && !d.img) p.push('問題文（または画像）');
     if(d.choices.some(c=>!c)) p.push('選択肢');
     if(d.answer < 0) p.push('正解の選択');
     if(p.length){ errs.push(`${NUMS[i]}：${p.join('・')}が まだです`); document.querySelectorAll('.qCard')[i].classList.add('err'); }
@@ -712,7 +842,14 @@ let draftTimer = null;
 function saveDraftSoon(){
   if(EMBEDDED) return;
   clearTimeout(draftTimer);
-  draftTimer = setTimeout(()=>{ const q = readEditor(); q.questions = edData; store.set(DRAFT_KEY, JSON.stringify(q)); }, 400);
+  draftTimer = setTimeout(()=>{
+    const q = readEditor(); q.questions = edData;
+    try { localStorage.setItem(DRAFT_KEY, JSON.stringify(q)); }
+    catch(e){ // 画像が大きくて入りきらないときは、画像なしで一時保存
+      const lite = JSON.parse(JSON.stringify(q)); lite.questions.forEach(x=>x.img='');
+      store.set(DRAFT_KEY, JSON.stringify(lite));
+    }
+  }, 400);
 }
 function buildChildHtml(quiz){
   const json = JSON.stringify(quiz).replace(/</g, '\\u003c');
@@ -1005,6 +1142,9 @@ class Game {
     const order = this.quiz.shuffle ? shuffle([0,1,2]) : [0,1,2];
     $('quizDoor').textContent = `${NUMS[d.num-1]} の とびら`;
     $('quizQ').textContent = qd.q;
+    $('quizImg').classList.toggle('hidden', !qd.img);
+    $('quizImg').closest('.quizCard').classList.toggle('hasImg', !!qd.img);
+    $('quizImg').src = qd.img || '';
     const box = $('quizChoices'); box.innerHTML = '';
     order.forEach((ci, pos)=>{
       const b = document.createElement('button');
@@ -1259,6 +1399,8 @@ function startReview(){
     const li = document.createElement('li'); li.className='rqItem'; li.dataset.i=i;
     li.innerHTML = `<div class="rqNum">${i+1}</div><div class="rqBody"><div class="rqText"></div><div class="rqChoices"></div></div><div class="stamp"></div>`;
     li.querySelector('.rqText').textContent = qd.q;
+    if(qd.img){ const im = document.createElement('img'); im.className='rqImg'; im.src = qd.img; im.alt='問題の画像';
+      im.onclick = ()=> zoom(qd.img); li.querySelector('.rqText').after(im); }
     const box = li.querySelector('.rqChoices');
     order.forEach((ci,pos)=>{
       const b = document.createElement('button'); b.className='rqc'; b.dataset.c=ci;
@@ -1379,6 +1521,12 @@ $('edTest').onclick = ()=>{
 };
 $('edSave').onclick = saveChildFile;
 $('edGas').onclick = openGas;
+$('edJsonSave').onclick = saveJson;
+$('edJsonLoad').onclick = ()=> $('edJsonFile').click();
+$('edJsonFile').onchange = ()=>{ const f = $('edJsonFile').files[0]; if(f) loadJsonFile(f); $('edJsonFile').value=''; };
+function zoom(src){ $('zoomImg').src = src; $('zoomBox').classList.remove('hidden'); }
+$('zoomBox').onclick = ()=> $('zoomBox').classList.add('hidden');
+$('quizImg').onclick = ()=> zoom($('quizImg').src);
 $('gasClose').onclick = ()=> $('gasModal').classList.add('hidden');
 $('gasCopyGs').onclick = ()=> copyText(gasGs, 'gasCopiedGs');
 $('gasCopyIdx').onclick = ()=> copyText(gasHtml, 'gasCopiedIdx');
